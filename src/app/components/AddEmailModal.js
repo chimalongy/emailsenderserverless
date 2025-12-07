@@ -3,11 +3,27 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../components/AuthProvider'
 import { supabase } from '../lib/supabase'
+import {
+  FiEye,
+  FiEyeOff,
+  FiMail,
+  FiUser,
+  FiKey,
+  FiBarChart2,
+  FiEdit3,
+  FiX,
+  FiCheck,
+  FiAlertCircle,
+  FiHelpCircle,
+  FiShield
+} from 'react-icons/fi'
+import { HiOutlineDocumentText, HiOutlineExclamationCircle } from 'react-icons/hi'
 
 export default function AddEmailModal({ isOpen, onClose, onSuccess, editingEmail }) {
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [testingEmail, setTestingEmail] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({
     sender_name: '',
     email: '',
@@ -15,6 +31,7 @@ export default function AddEmailModal({ isOpen, onClose, onSuccess, editingEmail
     daily_limit: 100,
     signature: ''
   })
+  const [errors, setErrors] = useState({})
 
   useEffect(() => {
     if (editingEmail) {
@@ -34,10 +51,42 @@ export default function AddEmailModal({ isOpen, onClose, onSuccess, editingEmail
         signature: ''
       })
     }
-  }, [editingEmail])
+    setErrors({})
+    setShowPassword(false)
+  }, [editingEmail, isOpen])
+
+  const validateForm = () => {
+    const newErrors = {}
+    
+    if (!formData.sender_name.trim()) {
+      newErrors.sender_name = 'Sender name is required'
+    }
+    
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address'
+    }
+    
+    if (!editingEmail && !formData.app_password) {
+      newErrors.app_password = 'App password is required'
+    }
+    
+    if (formData.daily_limit < 1 || formData.daily_limit > 500) {
+      newErrors.daily_limit = 'Daily limit must be between 1 and 500'
+    }
+    
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    
+    if (!validateForm()) {
+      return
+    }
+    
     setLoading(true)
 
     try {
@@ -62,7 +111,10 @@ export default function AddEmailModal({ isOpen, onClose, onSuccess, editingEmail
 
         if (!testResult.success) {
           // Test email failed - don't save the account
-          alert(testResult.message || 'Could not send test email. Please check your app password and try again.')
+          setErrors({ 
+            ...errors, 
+            app_password: testResult.message || 'Could not send test email. Please check your app password.' 
+          })
           setLoading(false)
           return
         }
@@ -88,7 +140,10 @@ export default function AddEmailModal({ isOpen, onClose, onSuccess, editingEmail
 
         if (!testResult.success) {
           // Test email failed - don't update the account
-          alert(testResult.message || 'Could not send test email. Please check your app password and try again.')
+          setErrors({ 
+            ...errors, 
+            app_password: testResult.message || 'Could not send test email. Please check your app password.' 
+          })
           setLoading(false)
           return
         }
@@ -129,7 +184,10 @@ export default function AddEmailModal({ isOpen, onClose, onSuccess, editingEmail
       onSuccess()
     } catch (error) {
       console.error('Error saving email account:', error)
-      alert('Error saving email account: ' + error.message)
+      setErrors({ 
+        ...errors, 
+        submit: 'Error saving email account: ' + error.message 
+      })
     } finally {
       setLoading(false)
     }
@@ -145,120 +203,299 @@ export default function AddEmailModal({ isOpen, onClose, onSuccess, editingEmail
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-96 overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b">
-          <h3 className="text-lg font-semibold">
-            {editingEmail ? 'Edit Email Account' : 'Add New Email Account'}
-          </h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-white">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-indigo-100 rounded-lg">
+              {editingEmail ? (
+                <FiEdit3 className="h-6 w-6 text-indigo-600" />
+              ) : (
+                <FiMail className="h-6 w-6 text-indigo-600" />
+              )}
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-gray-900">
+                {editingEmail ? 'Edit Email Account' : 'Add New Email Account'}
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">
+                {editingEmail 
+                  ? 'Update your email account details' 
+                  : 'Connect your email to start sending campaigns'}
+              </p>
+            </div>
+          </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-2xl"
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            ×
+            <FiX className="h-5 w-5 text-gray-500" />
           </button>
         </div>
-        
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Sender Name
-            </label>
-            <input
-              type="text"
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-              value={formData.sender_name}
-              onChange={(e) => setFormData({ ...formData, sender_name: e.target.value })}
-              placeholder="John Doe"
-            />
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email Address
-            </label>
-            <input
-              type="email"
-              required
-              disabled={!!editingEmail}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              placeholder="john@gmail.com"
-            />
-          </div>
+        {/* Form Content - Scrollable */}
+        <div className="flex-1 overflow-y-auto p-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Sender Name */}
+            <div>
+              <label className="flex items-center text-sm font-semibold text-gray-900 mb-2">
+                <FiUser className="mr-2 h-4 w-4 text-indigo-600" />
+                Sender Name
+              </label>
+              <input
+                type="text"
+                required
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
+                  errors.sender_name 
+                    ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
+                    : 'border-gray-300 focus:ring-indigo-500 focus:border-indigo-500'
+                }`}
+                value={formData.sender_name}
+                onChange={(e) => setFormData({ ...formData, sender_name: e.target.value })}
+                placeholder="John Doe"
+              />
+              {errors.sender_name && (
+                <p className="flex items-center mt-2 text-sm text-red-600">
+                  <HiOutlineExclamationCircle className="mr-1 h-4 w-4" />
+                  {errors.sender_name}
+                </p>
+              )}
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              App Password
-            </label>
-            <input
-              type="password"
-              required={!editingEmail}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-              value={formData.app_password}
-              onChange={(e) => setFormData({ ...formData, app_password: e.target.value })}
-              placeholder="Your Gmail app password"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              {editingEmail 
-                ? 'Leave blank to keep current password. If updating, a test email will be sent to verify.' 
-                : 'Get this from Google Account settings. A test email will be sent to verify your credentials.'}
-            </p>
-          </div>
+            {/* Email Address */}
+            <div>
+              <label className="flex items-center text-sm font-semibold text-gray-900 mb-2">
+                <FiMail className="mr-2 h-4 w-4 text-indigo-600" />
+                Email Address
+              </label>
+              <input
+                type="email"
+                required
+                disabled={!!editingEmail}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-colors disabled:bg-gray-100 ${
+                  errors.email 
+                    ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
+                    : 'border-gray-300 focus:ring-indigo-500 focus:border-indigo-500'
+                }`}
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="john@example.com"
+              />
+              {errors.email && (
+                <p className="flex items-center mt-2 text-sm text-red-600">
+                  <HiOutlineExclamationCircle className="mr-1 h-4 w-4" />
+                  {errors.email}
+                </p>
+              )}
+              {editingEmail && (
+                <p className="text-xs text-gray-500 mt-2">
+                  <FiAlertCircle className="inline mr-1 h-3 w-3" />
+                  Email address cannot be changed for existing accounts
+                </p>
+              )}
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Daily Sending Limit
-            </label>
-            <input
-              type="number"
-              required
-              min="1"
-              max="500"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-              value={formData.daily_limit}
-              onChange={handleNumberChange}
-            />
-          </div>
+            {/* App Password */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="flex items-center text-sm font-semibold text-gray-900">
+                  <FiKey className="mr-2 h-4 w-4 text-indigo-600" />
+                  App Password
+                </label>
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="text-xs text-indigo-600 hover:text-indigo-700 flex items-center"
+                  >
+                    {showPassword ? (
+                      <>
+                        <FiEyeOff className="mr-1 h-3 w-3" />
+                        Hide
+                      </>
+                    ) : (
+                      <>
+                        <FiEye className="mr-1 h-3 w-3" />
+                        Show
+                      </>
+                    )}
+                  </button>
+                  <a
+                    href="https://support.google.com/accounts/answer/185833"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-gray-500 hover:text-gray-700 flex items-center"
+                    title="How to get app password"
+                  >
+                    <FiHelpCircle className="h-3 w-3" />
+                  </a>
+                </div>
+              </div>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required={!editingEmail}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-colors pr-12 ${
+                    errors.app_password 
+                      ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
+                      : 'border-gray-300 focus:ring-indigo-500 focus:border-indigo-500'
+                  }`}
+                  value={formData.app_password}
+                  onChange={(e) => setFormData({ ...formData, app_password: e.target.value })}
+                  placeholder={editingEmail ? "Enter new password to update" : "Your Gmail app password"}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? (
+                    <FiEyeOff className="h-5 w-5" />
+                  ) : (
+                    <FiEye className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
+              {errors.app_password && (
+                <p className="flex items-center mt-2 text-sm text-red-600">
+                  <HiOutlineExclamationCircle className="mr-1 h-4 w-4" />
+                  {errors.app_password}
+                </p>
+              )}
+              <p className="text-xs text-gray-500 mt-2">
+                <FiShield className="inline mr-1 h-3 w-3" />
+                {editingEmail 
+                  ? 'Leave blank to keep current password. A test email will be sent if you update it.' 
+                  : 'Generate from Google Account → Security → App passwords'}
+              </p>
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Signature
-            </label>
-            <textarea
-              rows="3"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-              value={formData.signature}
-              onChange={(e) => setFormData({ ...formData, signature: e.target.value })}
-              placeholder="Best regards,&#10;John Doe"
-            />
-          </div>
+            {/* Daily Limit */}
+            <div>
+              <label className="flex items-center text-sm font-semibold text-gray-900 mb-2">
+                <FiBarChart2 className="mr-2 h-4 w-4 text-indigo-600" />
+                Daily Sending Limit
+              </label>
+              <div className="flex items-center space-x-4">
+                <input
+                  type="range"
+                  min="1"
+                  max="500"
+                  step="1"
+                  className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  value={formData.daily_limit}
+                  onChange={(e) => setFormData({ ...formData, daily_limit: parseInt(e.target.value) })}
+                />
+                <div className="w-24">
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    max="500"
+                    className={`w-full px-3 py-2 border rounded-lg text-center font-semibold ${
+                      errors.daily_limit 
+                        ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
+                        : 'border-gray-300 focus:ring-indigo-500 focus:border-indigo-500'
+                    }`}
+                    value={formData.daily_limit}
+                    onChange={handleNumberChange}
+                  />
+                </div>
+              </div>
+              {errors.daily_limit && (
+                <p className="flex items-center mt-2 text-sm text-red-600">
+                  <HiOutlineExclamationCircle className="mr-1 h-4 w-4" />
+                  {errors.daily_limit}
+                </p>
+              )}
+              <p className="text-xs text-gray-500 mt-2">
+                Maximum number of emails this account can send per day
+              </p>
+            </div>
 
-          <div className="flex justify-end space-x-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
-            >
-              {testingEmail 
-                ? 'Sending Test Email...' 
-                : loading 
-                  ? (editingEmail ? 'Updating...' : 'Saving...') 
-                  : editingEmail 
-                    ? 'Update' 
-                    : 'Add Email'}
-            </button>
+            {/* Signature */}
+            <div>
+              <label className="flex items-center text-sm font-semibold text-gray-900 mb-2">
+                <HiOutlineDocumentText className="mr-2 h-4 w-4 text-indigo-600" />
+                Email Signature
+              </label>
+              <textarea
+                rows="4"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors resize-none"
+                value={formData.signature}
+                onChange={(e) => setFormData({ ...formData, signature: e.target.value })}
+                placeholder="Best regards,&#10;John Doe&#10;CEO at Example Corp"
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                This signature will be automatically appended to all emails sent from this account
+              </p>
+            </div>
+
+            {/* Form-level error */}
+            {errors.submit && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="flex items-center text-sm text-red-600">
+                  <HiOutlineExclamationCircle className="mr-2 h-4 w-4" />
+                  {errors.submit}
+                </p>
+              </div>
+            )}
+          </form>
+        </div>
+
+        {/* Footer with Actions */}
+        <div className="border-t border-gray-200 p-6 bg-gray-50">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-600">
+              {testingEmail ? (
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600 mr-2"></div>
+                  Sending test email to verify credentials...
+                </div>
+              ) : (
+                <div className="flex items-center">
+                  <FiCheck className="mr-2 h-4 w-4 text-green-500" />
+                  {editingEmail ? 'Your changes will be saved immediately' : 'Account will be verified before saving'}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center space-x-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                onClick={handleSubmit}
+                disabled={loading || testingEmail}
+                className="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-lg hover:from-indigo-700 hover:to-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center"
+              >
+                {loading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    {editingEmail ? 'Updating...' : 'Creating...'}
+                  </>
+                ) : testingEmail ? (
+                  'Testing...'
+                ) : editingEmail ? (
+                  <>
+                    <FiCheck className="mr-2 h-4 w-4" />
+                    Update Account
+                  </>
+                ) : (
+                  <>
+                    <FiMail className="mr-2 h-4 w-4" />
+                    Add Email Account
+                  </>
+                )}
+              </button>
+            </div>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   )

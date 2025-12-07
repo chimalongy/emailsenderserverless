@@ -3,6 +3,189 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../components/AuthProvider'
 import { supabase } from '../lib/supabase'
+import {
+  FiX,
+  FiMail,
+  FiList,
+  FiUsers,
+  FiCheck,
+  FiChevronRight,
+  FiChevronLeft,
+  FiPlus,
+  FiSearch,
+  FiFilter,
+  FiBarChart2,
+  FiTarget,
+  FiDivide,
+  FiTrendingUp,
+  FiClock,
+  FiDatabase,
+  FiEye,
+  FiEyeOff,
+  FiRefreshCw,
+  FiAlertCircle,
+  FiInfo,
+  FiCalendar,
+  FiPackage,
+  FiMenu,
+  FiChevronDown
+} from 'react-icons/fi'
+import { HiOutlineChartBar, HiOutlineChip, HiOutlineLightningBolt } from 'react-icons/hi'
+import { TbMail, TbMailOpened } from 'react-icons/tb'
+
+// Custom components
+const StepIndicator = ({ step, totalSteps, title, description, icon: Icon, currentStep }) => (
+  <div className={`flex items-start space-x-3 md:space-x-4 p-3 md:p-0 rounded-lg md:rounded-none ${currentStep === step ? 'bg-indigo-50 md:bg-transparent' : ''}`}>
+    <div className={`flex-shrink-0 w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center ${
+      currentStep === step ? 'bg-indigo-600 text-white' : 
+      currentStep > step ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'
+    }`}>
+      {currentStep > step ? <FiCheck className="h-4 w-4 md:h-5 md:w-5" /> : <Icon className="h-4 w-4 md:h-5 md:w-5" />}
+    </div>
+    <div className="flex-1 min-w-0">
+      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 hidden md:block">
+        Step {step} of {totalSteps}
+      </p>
+      <h4 className="text-sm md:text-base font-semibold text-gray-900 truncate">{title}</h4>
+      <p className="text-xs md:text-sm text-gray-600 mt-1 hidden sm:block">{description}</p>
+    </div>
+  </div>
+)
+
+const StatBadge = ({ icon: Icon, label, value, color = 'blue', size = 'md', className = '' }) => {
+  const sizeClasses = {
+    sm: 'px-2 py-1 text-xs',
+    md: 'px-3 py-1.5 text-xs md:text-sm',
+    lg: 'px-4 py-2 text-sm md:text-base'
+  }
+
+  const colorClasses = {
+    blue: 'bg-blue-50 text-blue-700 border-blue-100',
+    green: 'bg-green-50 text-green-700 border-green-100',
+    orange: 'bg-orange-50 text-orange-700 border-orange-100',
+    purple: 'bg-purple-50 text-purple-700 border-purple-100',
+    indigo: 'bg-indigo-50 text-indigo-700 border-indigo-100'
+  }
+
+  return (
+    <div className={`inline-flex items-center rounded-lg border ${sizeClasses[size]} ${colorClasses[color]} ${className}`}>
+      <Icon className="mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+      <span className="font-medium truncate">{label}:</span>
+      <span className="ml-1 font-bold truncate">{value}</span>
+    </div>
+  )
+}
+
+const ProgressBar = ({ current, total, label }) => {
+  const percentage = total > 0 ? Math.round((current / total) * 100) : 0
+  
+  return (
+    <div className="space-y-1 md:space-y-2">
+      <div className="flex justify-between text-xs md:text-sm">
+        <span className="font-medium text-gray-700 truncate">{label}</span>
+        <span className="font-semibold whitespace-nowrap ml-2">
+          {current} / {total} ({percentage}%)
+        </span>
+      </div>
+      <div className="h-1.5 md:h-2 bg-gray-200 rounded-full overflow-hidden">
+        <div 
+          className={`h-full rounded-full transition-all duration-500 ${
+            percentage === 100 ? 'bg-green-500' :
+            percentage >= 75 ? 'bg-blue-500' :
+            percentage >= 50 ? 'bg-yellow-500' :
+            percentage >= 25 ? 'bg-orange-500' :
+            'bg-red-500'
+          }`}
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
+const AccountCard = ({ account, selected, onSelect, onAllocationChange, maxAllocation }) => (
+  <div className={`p-3 md:p-4 rounded-lg md:rounded-xl border transition-all duration-200 ${
+    selected 
+      ? 'border-indigo-300 bg-indigo-50 shadow-sm' 
+      : 'border-gray-200 bg-white hover:border-gray-300'
+  }`}>
+    <div className="flex items-start justify-between mb-2 md:mb-3">
+      <div className="flex items-center space-x-2 md:space-x-3 flex-1 min-w-0">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={(e) => onSelect(e.target.checked)}
+          className="h-4 w-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 flex-shrink-0"
+        />
+        <div className="min-w-0 flex-1">
+          <h4 className="font-medium text-gray-900 text-sm md:text-base truncate">{account.sender_name}</h4>
+          <p className="text-xs text-gray-600 truncate">{account.email}</p>
+        </div>
+      </div>
+      <div className="text-right ml-2 flex-shrink-0">
+        <div className="text-xs font-medium text-gray-500">Capacity</div>
+        <div className="text-xs md:text-sm font-semibold whitespace-nowrap">
+          <span className="text-gray-600">{account.sent_today || 0}</span>
+          <span className="text-gray-400 mx-1">/</span>
+          <span className="text-indigo-600">{account.daily_limit}</span>
+        </div>
+      </div>
+    </div>
+
+    <div className="space-y-2 md:space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-xs md:text-sm text-gray-600">Available</span>
+        <span className="text-xs md:text-sm font-semibold text-green-600 whitespace-nowrap">
+          {account.available_capacity} emails
+        </span>
+      </div>
+
+      <div className="space-y-1.5 md:space-y-2">
+        <div className="flex items-center justify-between text-xs md:text-sm">
+          <span className="text-gray-600">Allocate</span>
+          <span className="font-medium whitespace-nowrap">
+            <span className="text-indigo-600">{account.allocated_emails}</span>
+            <span className="text-gray-400 mx-1">/</span>
+            <span className="text-gray-600">{account.available_capacity}</span>
+          </span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <input
+            type="range"
+            min="0"
+            max={Math.min(account.available_capacity, maxAllocation)}
+            value={account.allocated_emails}
+            onChange={(e) => onAllocationChange(parseInt(e.target.value) || 0)}
+            className="flex-1 h-1.5 md:h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+          />
+          <input
+            type="number"
+            min="0"
+            max={Math.min(account.available_capacity, maxAllocation)}
+            value={account.allocated_emails}
+            onChange={(e) => onAllocationChange(parseInt(e.target.value) || 0)}
+            className="w-16 md:w-20 px-2 py-1.5 text-xs md:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
+      </div>
+
+      {account.allocated_emails > 0 && (
+        <div className="mt-1.5 md:mt-2 pt-1.5 md:pt-2 border-t border-gray-100">
+          <div className="flex items-center text-xs">
+            <div className="flex-1 text-green-600 font-medium truncate">
+              ✓ {account.allocated_emails} emails allocated
+            </div>
+            {account.allocated_emails === account.available_capacity && (
+              <span className="px-1.5 py-0.5 bg-green-100 text-green-800 text-xs font-medium rounded flex-shrink-0 ml-2">
+                Full
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
+)
 
 export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
   const { user } = useAuth()
@@ -12,16 +195,32 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
   const [formData, setFormData] = useState({
     name: '',
     emailList: '',
-    allocations: [], // frontend-only structure used to build outbound config
+    allocations: [],
   })
   const [validationError, setValidationError] = useState('')
   const [bulkAllocation, setBulkAllocation] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
+  const [viewMode, setViewMode] = useState('grid')
+  const [showInstructions, setShowInstructions] = useState(true)
+  const [isMobile, setIsMobile] = useState(false)
+  const [showMobileStepper, setShowMobileStepper] = useState(false)
+
+  // Check mobile viewport
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   // Fetch email accounts when modal opens
   useEffect(() => {
     if (isOpen && user) {
       fetchEmailAccounts()
+      setShowInstructions(true)
     }
   }, [isOpen, user])
 
@@ -36,15 +235,12 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
 
       if (error) throw error
       
-      // Get today's date range (start of day to end of day in UTC)
       const now = new Date()
       const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0))
       const endOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999))
       
-      // For each account, count emails sent today from email_queue
       const accountsWithTodayCount = await Promise.all(
         (data || []).map(async (account) => {
-          // Count emails sent today for this account
           const { count: sentTodayCount, error: countError } = await supabase
             .from('email_queue')
             .select('*', { count: 'exact', head: true })
@@ -53,11 +249,8 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
             .gte('sent_at', startOfToday.toISOString())
             .lte('sent_at', endOfToday.toISOString())
 
-          if (countError) {
-            console.error(`Error counting emails for account ${account.id}:`, countError)
-          }
+          if (countError) console.error(`Error counting emails for account ${account.id}:`, countError)
 
-          // Return account with actual sent_today count from today
           return {
             ...account,
             sent_today: sentTodayCount || 0
@@ -88,12 +281,10 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
     }
   }
 
-  // Initialize allocations when moving to step 2
   const initializeAllocations = () => {
     const validation = validateEmailList(formData.emailList)
     if (!validation.valid) return false
 
-    const totalEmails = validation.emails.length
     const availableAccounts = emailAccounts.filter(account => account.active)
     
     if (availableAccounts.length === 0) {
@@ -101,16 +292,13 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
       return false
     }
 
-    // Initialize allocations with zero for each account
-    // available_capacity is set to daily_limit (not reduced by sent_today)
-    // This allows allocation based on full daily capacity, regardless of emails already sent today
     const initialAllocations = availableAccounts.map(account => ({
       account_id: account.id,
       sender_name: account.sender_name,
       email: account.email,
       daily_limit: account.daily_limit,
-      sent_today: account.sent_today || 0, // For display only, not used in capacity calculation
-      available_capacity: account.daily_limit, // Full daily limit, not reduced by sent_today
+      sent_today: account.sent_today || 0,
+      available_capacity: account.daily_limit,
       allocated_emails: 0,
       selected: false
     }))
@@ -124,22 +312,18 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
     const totalEmails = getTotalEmails()
     const currentAllocation = getTotalAllocated()
     
-    // Find the account being updated
     const account = formData.allocations.find(acc => acc.account_id === accountId)
     if (!account) return
 
-    // Calculate the new total if this change were applied
     const currentAccountAllocation = account.allocated_emails
     const potentialNewTotal = currentAllocation - currentAccountAllocation + numValue
 
-    // Prevent allocation from exceeding total emails
     if (potentialNewTotal > totalEmails) {
       const maxAllowed = numValue - (potentialNewTotal - totalEmails)
-      setValidationError(`Cannot allocate more than ${totalEmails} total emails. Maximum allowed for this account: ${Math.min(maxAllowed, account.available_capacity)}`)
+      setValidationError(`Cannot allocate more than ${totalEmails} total emails. Maximum allowed: ${Math.min(maxAllowed, account.available_capacity)}`)
       return
     }
 
-    // Ensure allocation doesn't exceed account capacity
     const finalAllocation = Math.min(numValue, account.available_capacity)
     
     setFormData(prev => ({
@@ -175,14 +359,12 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
       return
     }
 
-    // Calculate total potential allocation
     const totalPotentialAllocation = selectedAccounts.reduce((sum, account) => {
       const availableForAccount = Math.min(account.available_capacity, numValue)
       return sum + availableForAccount
     }, 0)
 
     if (totalPotentialAllocation > remainingEmails) {
-      // Distribute proportionally to stay within limits
       const scaleFactor = remainingEmails / totalPotentialAllocation
       selectedAccounts.forEach(account => {
         const allocated = Math.floor(Math.min(account.available_capacity, numValue) * scaleFactor)
@@ -190,7 +372,6 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
         handleAllocationChange(account.account_id, finalAllocation)
       })
     } else {
-      // Apply the full allocation
       selectedAccounts.forEach(account => {
         const finalAllocation = Math.min(account.available_capacity, numValue)
         handleAllocationChange(account.account_id, finalAllocation)
@@ -231,10 +412,6 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
       .map(email => email.trim())
       .filter(email => email.length > 0)
       .length
-  }
-
-  const getSelectedAccounts = () => {
-    return formData.allocations.filter(acc => acc.selected)
   }
 
   const applyQuickAllocation = (strategy) => {
@@ -280,7 +457,6 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
         distributed += finalAdditional
       })
     } else if (strategy === 'fill') {
-      // Fill accounts sequentially until all emails are allocated
       let emailsLeft = remainingEmails
       accountsToUpdate.forEach(account => {
         if (emailsLeft > 0) {
@@ -303,7 +479,6 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
 
   const handleNextStep = () => {
     if (step === 1) {
-      // Validate step 1
       if (!formData.name.trim()) {
         setValidationError('Campaign name is required')
         return
@@ -325,7 +500,6 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
         return
       }
 
-      // Initialize allocations for step 2
       if (!initializeAllocations()) {
         return
       }
@@ -333,7 +507,6 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
       setValidationError('')
       setStep(2)
     } else if (step === 2) {
-      // Validate step 2 - ALL emails must be allocated
       const totalAllocated = getTotalAllocated()
       const totalEmails = getTotalEmails()
 
@@ -342,13 +515,11 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
         return
       }
 
-      // CRITICAL: All emails must be allocated
       if (totalAllocated !== totalEmails) {
         setValidationError(`You must allocate ALL ${totalEmails} emails. Currently allocated: ${totalAllocated}. Please allocate the remaining ${totalEmails - totalAllocated} emails.`)
         return
       }
 
-      // Check if any allocation exceeds daily limit (available capacity)
       const overAllocated = formData.allocations.find(allocation => 
         allocation.allocated_emails > allocation.available_capacity
       )
@@ -368,17 +539,6 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
   }
 
   const handleSaveOutbound = async () => {
-    /**
-     * IMPORTANT: This now only creates the outbound record.
-     * It does NOT create any email_queue rows.
-     *
-     * The recipient list and allocation config are stored on the outbound,
-     * so that each task can build its own queue entries independently.
-     *
-     * Make sure your Supabase `outbounds` table has these columns:
-     * - email_list: text
-     * - allocations: jsonb
-     */
     setLoading(true)
     try {
       const { error: outboundError } = await supabase
@@ -422,458 +582,699 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b">
-          <h3 className="text-lg font-semibold">Add Outbound Campaign</h3>
-          <button
-            onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 text-2xl"
-          >
-            ×
-          </button>
-        </div>
-        
-        <div className="p-6">
-          {/* Stepper */}
-          <div className="mb-6">
-            <div className="flex items-center justify-center space-x-4">
-              {[1, 2, 3].map((stepNumber) => (
-                <div key={stepNumber} className="flex items-center">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                    step === stepNumber
-                      ? 'bg-indigo-600 text-white'
-                      : step > stepNumber
-                      ? 'bg-green-500 text-white'
-                      : 'bg-gray-200 text-gray-600'
-                  }`}>
-                    {step > stepNumber ? '✓' : stepNumber}
-                  </div>
-                  {stepNumber < 3 && (
-                    <div className={`w-12 h-1 mx-2 ${
-                      step > stepNumber ? 'bg-green-500' : 'bg-gray-200'
-                    }`} />
-                  )}
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-between mt-2 text-xs text-gray-500">
-              <span>Outbound Info</span>
-              <span>Allocation</span>
-              <span>Review</span>
-            </div>
-          </div>
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex min-h-screen items-center justify-center p-2 sm:p-4">
+        {/* Backdrop */}
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={handleClose}></div>
 
-          {/* Error Message */}
-          {validationError && (
-            <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-4">
-              <p className="text-sm text-red-800">{validationError}</p>
-            </div>
-          )}
-
-          {/* Step 1: Outbound Info */}
-          {step === 1 && (
-            <div className="space-y-4">
-              <h4 className="font-medium text-gray-900">Campaign Information</h4>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Campaign Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Q4 Outreach Campaign"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                />
+        {/* Modal */}
+        <div className="relative bg-white rounded-xl md:rounded-2xl shadow-2xl w-full max-w-full md:max-w-6xl max-h-[90vh] md:max-h-[90vh] overflow-hidden flex flex-col mx-auto">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-white">
+            <div className="flex items-center space-x-2 md:space-x-4 flex-1 min-w-0">
+              <div className="p-2 md:p-3 bg-indigo-100 rounded-lg md:rounded-xl">
+                <HiOutlineLightningBolt className="h-5 w-5 md:h-7 md:w-7 text-indigo-600" />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email List *
-                </label>
-                <textarea
-                  rows="8"
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm"
-                  placeholder="example1@gmail.com&#10;example2@gmail.com&#10;example3@gmail.com"
-                  value={formData.emailList}
-                  onChange={(e) => setFormData({ ...formData, emailList: e.target.value })}
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Enter one email address per line. {formData.emailList && `Found ${getTotalEmails()} emails.`}
+              <div className="min-w-0 flex-1">
+                <h3 className="text-lg md:text-2xl font-bold text-gray-900 truncate">Create New Campaign</h3>
+                <p className="text-xs md:text-sm text-gray-600 mt-0.5 hidden sm:block">
+                  Build your outbound email campaign in 3 simple steps
                 </p>
               </div>
+            </div>
+            <button
+              onClick={handleClose}
+              className="p-1 md:p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0 ml-2"
+            >
+              <FiX className="h-5 w-5 md:h-6 md:w-6 text-gray-500" />
+            </button>
+          </div>
 
-              {/* Available Email Accounts */}
-              <div className="mt-6">
-                <h5 className="text-sm font-medium text-gray-700 mb-2">
-                  Available Email Accounts ({emailAccounts.length})
-                </h5>
-                {emailAccounts.length === 0 ? (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
-                    <p className="text-sm text-yellow-800">
-                      No active email accounts found. Please add email accounts first.
-                    </p>
+          {/* Mobile Stepper Toggle */}
+          {isMobile && (
+            <button
+              onClick={() => setShowMobileStepper(!showMobileStepper)}
+              className="md:hidden flex items-center justify-between w-full p-3 bg-gray-50 border-b border-gray-200"
+            >
+              <span className="font-medium text-sm">
+                Step {step} of 3: {step === 1 ? 'Campaign Setup' : step === 2 ? 'Email Allocation' : 'Review & Create'}
+              </span>
+              <FiChevronDown className={`h-4 w-4 transform transition-transform ${showMobileStepper ? 'rotate-180' : ''}`} />
+            </button>
+          )}
+
+          {/* Content */}
+          <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
+            {/* Left Sidebar - Stepper - Hidden on mobile unless toggled */}
+            <div className={`${isMobile ? (showMobileStepper ? 'block' : 'hidden') : 'block'} md:block w-full md:w-72 border-b md:border-b-0 md:border-r border-gray-200 bg-gray-50 p-3 md:p-4 lg:p-6 overflow-y-auto`}>
+              <div className="space-y-4 md:space-y-8">
+                <StepIndicator
+                  step={1}
+                  totalSteps={3}
+                  title="Campaign Setup"
+                  description="Name your campaign and add recipient emails"
+                  icon={FiPackage}
+                  currentStep={step}
+                />
+                <StepIndicator
+                  step={2}
+                  totalSteps={3}
+                  title="Email Allocation"
+                  description="Distribute emails across your sending accounts"
+                  icon={FiTarget}
+                  currentStep={step}
+                />
+                <StepIndicator
+                  step={3}
+                  totalSteps={3}
+                  title="Review & Create"
+                  description="Review settings and launch your campaign"
+                  icon={FiCheck}
+                  currentStep={step}
+                />
+              </div>
+
+              {/* Stats Summary */}
+              <div className="mt-6 md:mt-8 pt-4 md:pt-6 border-t border-gray-200">
+                <h5 className="text-sm font-semibold text-gray-900 mb-2 md:mb-3">Campaign Summary</h5>
+                <div className="space-y-2 md:space-y-3">
+                  <div className="text-xs md:text-sm">
+                    <div className="text-gray-600 truncate">Campaign Name</div>
+                    <div className="font-medium truncate">{formData.name || 'Not set'}</div>
                   </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-60 overflow-y-auto">
-                    {emailAccounts.map(account => (
-                      <div key={account.id} className="bg-gray-50 rounded-md p-3">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <p className="font-medium text-sm">{account.sender_name}</p>
-                            <p className="text-xs text-gray-600">{account.email}</p>
+                  <div className="text-xs md:text-sm">
+                    <div className="text-gray-600">Total Recipients</div>
+                    <div className="font-medium">{getTotalEmails() || 0}</div>
+                  </div>
+                  <div className="text-xs md:text-sm">
+                    <div className="text-gray-600">Accounts Used</div>
+                    <div className="font-medium">
+                      {formData.allocations.filter(a => a.allocated_emails > 0).length || 0}
+                    </div>
+                  </div>
+                  <div className="pt-1 md:pt-2">
+                    <ProgressBar
+                      current={getTotalAllocated()}
+                      total={getTotalEmails() || 1}
+                      label="Allocation Progress"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Main Content */}
+            <div className="flex-1 overflow-y-auto p-3 md:p-4 lg:p-6">
+              {validationError && (
+                <div className="mb-4 p-3 md:p-4 bg-red-50 border border-red-200 rounded-lg md:rounded-xl">
+                  <div className="flex items-start">
+                    <FiAlertCircle className="h-4 w-4 md:h-5 md:w-5 text-red-400 mt-0.5 mr-2 md:mr-3 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-red-800 text-sm md:text-base">Action Required</p>
+                      <p className="text-xs md:text-sm text-red-700 mt-0.5 md:mt-1 break-words">{validationError}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 1 Content */}
+              {step === 1 && (
+                <div className="space-y-4 md:space-y-6">
+                  {showInstructions && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg md:rounded-xl p-3 md:p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-blue-900 text-sm md:text-base">📋 Campaign Setup Guide</p>
+                          <p className="text-xs md:text-sm text-blue-700 mt-0.5 md:mt-1">
+                            Enter your campaign name and recipient emails (one per line). 
+                            All emails will be distributed across your sending accounts in the next step.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setShowInstructions(false)}
+                          className="ml-2 md:ml-4 text-blue-500 hover:text-blue-700 flex-shrink-0"
+                        >
+                          <FiX className="h-3 w-3 md:h-4 md:w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-4 md:space-y-6">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-900 mb-1.5 md:mb-2">
+                        <FiPackage className="inline mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4 text-indigo-600" />
+                        Campaign Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        className="w-full px-3 md:px-4 py-2.5 md:py-3 text-base md:text-lg border border-gray-300 rounded-lg md:rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                        placeholder="Q4 Sales Outreach 2024"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5 md:mb-2">
+                        <label className="block text-sm font-semibold text-gray-900">
+                          <FiMail className="inline mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4 text-indigo-600" />
+                          Recipient Email List *
+                        </label>
+                        <span className="text-xs md:text-sm font-medium text-gray-600 whitespace-nowrap ml-2">
+                          {getTotalEmails()} emails
+                        </span>
+                      </div>
+                      <div className="border border-gray-300 rounded-lg md:rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500">
+                        <textarea
+                          rows="6"
+                          required
+                          className="w-full px-3 md:px-4 py-2.5 md:py-3 border-0 focus:outline-none font-mono text-xs md:text-sm resize-none min-h-[150px] md:min-h-[200px]"
+                          placeholder="john@example.com&#10;jane@company.com&#10;mark@gmail.com"
+                          value={formData.emailList}
+                          onChange={(e) => setFormData({ ...formData, emailList: e.target.value })}
+                        />
+                        <div className="px-3 md:px-4 py-1.5 md:py-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-500">
+                          Enter one email address per line
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Available Accounts Preview */}
+                    <div className="border border-gray-200 rounded-lg md:rounded-xl overflow-hidden">
+                      <div className="bg-gray-50 px-3 md:px-4 py-2 md:py-3 border-b border-gray-200">
+                        <h4 className="font-semibold text-gray-900 text-sm md:text-base flex items-center">
+                          <FiUsers className="mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+                          Available Sending Accounts ({emailAccounts.length})
+                        </h4>
+                      </div>
+                      {emailAccounts.length === 0 ? (
+                        <div className="p-4 md:p-6 text-center">
+                          <div className="w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
+                            <FiMail className="h-5 w-5 md:h-8 md:w-8 text-gray-400" />
                           </div>
-                          <div className="text-right">
-                            <p className="text-xs text-gray-600">
-                              {account.sent_today || 0}/{account.daily_limit} sent today
-                            </p>
-                            <p className="text-xs text-green-600">
-                              {account.daily_limit} max capacity
+                          <p className="mt-2 md:mt-4 text-gray-600 font-medium text-sm md:text-base">No email accounts found</p>
+                          <p className="text-xs md:text-sm text-gray-500 mt-0.5 md:mt-1">
+                            Add email accounts in Settings to start sending campaigns
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="p-2 md:p-4 grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-3 max-h-48 overflow-y-auto">
+                          {emailAccounts.slice(0, 4).map(account => (
+                            <div key={account.id} className="bg-white border border-gray-200 rounded-lg p-2 md:p-3">
+                              <div className="flex justify-between items-start">
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-medium text-xs md:text-sm truncate">{account.sender_name}</p>
+                                  <p className="text-xs text-gray-600 truncate">{account.email}</p>
+                                </div>
+                                <div className="text-right ml-2 flex-shrink-0">
+                                  <div className="text-xs font-medium text-gray-600 whitespace-nowrap">
+                                    {account.sent_today || 0}/{account.daily_limit}
+                                  </div>
+                                  <div className="text-xs text-green-600 font-semibold whitespace-nowrap">
+                                    {account.daily_limit} capacity
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          {emailAccounts.length > 4 && (
+                            <div className="col-span-1 sm:col-span-2 text-center py-1 md:py-2 text-xs md:text-sm text-gray-500">
+                              + {emailAccounts.length - 4} more accounts available
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2 Content */}
+              {step === 2 && (
+                <div className="space-y-4 md:space-y-6">
+                  {/* Header Stats */}
+                  <div className="bg-gradient-to-r from-indigo-50 to-white rounded-lg md:rounded-xl p-3 md:p-4 lg:p-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 md:gap-4">
+                      <div className="flex flex-wrap gap-2">
+                        <StatBadge
+                          icon={TbMail}
+                          label="Total Emails"
+                          value={getTotalEmails()}
+                          color="indigo"
+                          className="flex-1 sm:flex-none"
+                        />
+                        <StatBadge
+                          icon={FiCheck}
+                          label="Allocated"
+                          value={getTotalAllocated()}
+                          color={getTotalAllocated() === getTotalEmails() ? 'green' : 'orange'}
+                          className="flex-1 sm:flex-none"
+                        />
+                        <StatBadge
+                          icon={FiAlertCircle}
+                          label="Remaining"
+                          value={getTotalEmails() - getTotalAllocated()}
+                          color="orange"
+                          className="flex-1 sm:flex-none"
+                        />
+                      </div>
+                      {getTotalAllocated() === getTotalEmails() && (
+                        <div className="inline-flex items-center px-2 md:px-3 py-1 md:py-1.5 bg-green-100 text-green-800 text-xs md:text-sm font-medium rounded-full mt-2 sm:mt-0">
+                          <FiCheck className="mr-1 h-3 w-3 md:h-4 md:w-4" />
+                          All emails allocated ✓
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-3 md:mt-4">
+                      <ProgressBar
+                        current={getTotalAllocated()}
+                        total={getTotalEmails()}
+                        label="Allocation Progress"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Controls */}
+                  <div className="bg-gray-50 rounded-lg md:rounded-xl p-3 md:p-4 lg:p-5 space-y-3 md:space-y-4">
+                    <div className="flex flex-col gap-3 md:gap-4">
+                      <div className="flex-1">
+                        <label className="block text-sm font-semibold text-gray-900 mb-1.5 md:mb-2">
+                          <FiDivide className="inline mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+                          Bulk Allocation
+                        </label>
+                        <div className="flex flex-col sm:flex-row gap-2 md:gap-3">
+                          <input
+                            type="number"
+                            min="1"
+                            placeholder="Enter number of emails"
+                            className="flex-1 px-3 md:px-4 py-2 md:py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                            value={bulkAllocation}
+                            onChange={(e) => setBulkAllocation(e.target.value)}
+                          />
+                          <button
+                            type="button"
+                            onClick={handleBulkAllocation}
+                            className="px-3 md:px-5 py-2 md:py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-medium rounded-lg hover:from-indigo-700 hover:to-indigo-800 transition-all duration-200 text-sm whitespace-nowrap"
+                          >
+                            Apply to Selected
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1 md:mt-2">
+                          Allocate the same number of emails to all selected accounts
+                        </p>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSelectAll(true)}
+                          className="flex-1 sm:flex-none px-3 md:px-4 py-2 border border-gray-300 rounded-lg text-xs md:text-sm font-medium hover:bg-gray-50 transition-colors whitespace-nowrap"
+                        >
+                          Select All
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSelectAll(false)}
+                          className="flex-1 sm:flex-none px-3 md:px-4 py-2 border border-gray-300 rounded-lg text-xs md:text-sm font-medium hover:bg-gray-50 transition-colors whitespace-nowrap"
+                        >
+                          Deselect All
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Quick Allocation */}
+                    <div className="pt-3 md:pt-4 border-t border-gray-200">
+                      <label className="block text-sm font-semibold text-gray-900 mb-2 md:mb-3">
+                        <HiOutlineChartBar className="inline mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+                        Quick Allocation Strategies
+                      </label>
+                      <div className="flex flex-wrap gap-1.5 md:gap-2">
+                        <button
+                          type="button"
+                          onClick={() => applyQuickAllocation('equal')}
+                          className="flex-1 min-w-[calc(50%-0.375rem)] sm:flex-none px-3 md:px-4 py-2 bg-blue-50 text-blue-700 text-xs md:text-sm font-medium rounded-lg hover:bg-blue-100 transition-colors flex items-center justify-center"
+                        >
+                          <FiDivide className="mr-1.5 h-3 w-3 md:h-4 md:w-4" />
+                          Distribute Equally
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyQuickAllocation('capacity')}
+                          className="flex-1 min-w-[calc(50%-0.375rem)] sm:flex-none px-3 md:px-4 py-2 bg-green-50 text-green-700 text-xs md:text-sm font-medium rounded-lg hover:bg-green-100 transition-colors flex items-center justify-center"
+                        >
+                          <FiBarChart2 className="mr-1.5 h-3 w-3 md:h-4 md:w-4" />
+                          By Capacity %
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyQuickAllocation('fill')}
+                          className="flex-1 min-w-[calc(50%-0.375rem)] sm:flex-none px-3 md:px-4 py-2 bg-purple-50 text-purple-700 text-xs md:text-sm font-medium rounded-lg hover:bg-purple-100 transition-colors flex items-center justify-center"
+                        >
+                          <FiTrendingUp className="mr-1.5 h-3 w-3 md:h-4 md:w-4" />
+                          Fill Sequentially
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleSelectAll(false)
+                            setFormData(prev => ({
+                              ...prev,
+                              allocations: prev.allocations.map(acc => ({ ...acc, allocated_emails: 0 }))
+                            }))
+                          }}
+                          className="flex-1 min-w-[calc(50%-0.375rem)] sm:flex-none px-3 md:px-4 py-2 bg-red-50 text-red-700 text-xs md:text-sm font-medium rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center"
+                        >
+                          <FiRefreshCw className="mr-1.5 h-3 w-3 md:h-4 md:w-4" />
+                          Reset All
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Search and View Toggle */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 md:gap-4">
+                    <div className="flex-1 relative">
+                      <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 md:h-4 md:w-4 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search accounts..."
+                        className="w-full pl-9 md:pl-10 pr-4 py-2 md:py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 md:gap-3">
+                      <span className="text-xs md:text-sm text-gray-600 whitespace-nowrap">
+                        {filteredAccounts.length} accounts
+                      </span>
+                      <div className="flex bg-gray-100 p-0.5 md:p-1 rounded-lg">
+                        <button
+                          type="button"
+                          onClick={() => setViewMode('grid')}
+                          className={`px-2 md:px-3 py-1 md:py-1.5 text-xs md:text-sm rounded-md transition-colors whitespace-nowrap ${
+                            viewMode === 'grid' 
+                              ? 'bg-white text-indigo-600 shadow-sm' 
+                              : 'text-gray-600 hover:text-gray-900'
+                          }`}
+                        >
+                          Grid
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setViewMode('table')}
+                          className={`px-2 md:px-3 py-1 md:py-1.5 text-xs md:text-sm rounded-md transition-colors whitespace-nowrap ${
+                            viewMode === 'table' 
+                              ? 'bg-white text-indigo-600 shadow-sm' 
+                              : 'text-gray-600 hover:text-gray-900'
+                          }`}
+                        >
+                          Table
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Accounts Grid/Table */}
+                  {viewMode === 'grid' ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3 lg:gap-4">
+                      {filteredAccounts.map((account) => (
+                        <AccountCard
+                          key={account.account_id}
+                          account={account}
+                          selected={account.selected}
+                          onSelect={(selected) => handleSelectAccount(account.account_id, selected)}
+                          onAllocationChange={(value) => handleAllocationChange(account.account_id, value)}
+                          maxAllocation={getTotalEmails() - getTotalAllocated() + account.allocated_emails}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="border border-gray-200 rounded-lg md:rounded-xl overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                <input
+                                  type="checkbox"
+                                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-3 w-3 md:h-4 md:w-4"
+                                  checked={formData.allocations.length > 0 && formData.allocations.every(acc => acc.selected)}
+                                  onChange={(e) => handleSelectAll(e.target.checked)}
+                                />
+                              </th>
+                              <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                Account
+                              </th>
+                              <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                Capacity
+                              </th>
+                              <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                Available
+                              </th>
+                              <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                Allocated
+                              </th>
+                              <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                Status
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {filteredAccounts.map((account) => (
+                              <tr key={account.account_id} className="hover:bg-gray-50">
+                                <td className="px-2 py-2 md:px-4 md:py-3">
+                                  <input
+                                    type="checkbox"
+                                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-3 w-3 md:h-4 md:w-4"
+                                    checked={account.selected || false}
+                                    onChange={(e) => handleSelectAccount(account.account_id, e.target.checked)}
+                                  />
+                                </td>
+                                <td className="px-2 py-2 md:px-4 md:py-3">
+                                  <div className="min-w-0">
+                                    <div className="font-medium text-gray-900 text-xs md:text-sm truncate">
+                                      {account.sender_name}
+                                    </div>
+                                    <div className="text-xs text-gray-600 truncate">
+                                      {account.email}
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-2 py-2 md:px-4 md:py-3">
+                                  <div className="text-xs md:text-sm whitespace-nowrap">
+                                    {account.sent_today}/{account.daily_limit}
+                                  </div>
+                                </td>
+                                <td className="px-2 py-2 md:px-4 md:py-3">
+                                  <div className="font-medium text-green-600 text-xs md:text-sm">
+                                    {account.available_capacity}
+                                  </div>
+                                </td>
+                                <td className="px-2 py-2 md:px-4 md:py-3">
+                                  <div className="flex items-center gap-1 md:gap-2">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max={Math.min(account.available_capacity, getTotalEmails() - getTotalAllocated() + account.allocated_emails)}
+                                      className="w-16 md:w-20 px-1.5 md:px-2 py-1 md:py-1.5 border border-gray-300 rounded text-xs md:text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                      value={account.allocated_emails}
+                                      onChange={(e) => handleAllocationChange(account.account_id, e.target.value)}
+                                    />
+                                    <span className="text-xs text-gray-500 whitespace-nowrap">
+                                      / {account.available_capacity}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="px-2 py-2 md:px-4 md:py-3">
+                                  {account.allocated_emails > account.available_capacity ? (
+                                    <span className="inline-flex items-center px-1.5 md:px-2.5 py-0.5 md:py-1 text-xs font-medium rounded-full bg-red-100 text-red-800 whitespace-nowrap">
+                                      Over capacity
+                                    </span>
+                                  ) : account.allocated_emails > 0 ? (
+                                    <span className="inline-flex items-center px-1.5 md:px-2.5 py-0.5 md:py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 whitespace-nowrap">
+                                      {account.allocated_emails} allocated
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center px-1.5 md:px-2.5 py-0.5 md:py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800 whitespace-nowrap">
+                                      Not allocated
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {filteredAccounts.length === 0 && (
+                    <div className="text-center py-6 md:py-12">
+                      <div className="w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
+                        <FiSearch className="h-5 w-5 md:h-8 md:w-8 text-gray-400" />
+                      </div>
+                      <p className="mt-2 md:mt-4 text-gray-600 font-medium text-sm md:text-base">No accounts found</p>
+                      <p className="text-xs md:text-sm text-gray-500 mt-0.5 md:mt-1">
+                        Try adjusting your search criteria
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Step 3 Content */}
+              {step === 3 && (
+                <div className="space-y-4 md:space-y-6">
+                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg md:rounded-2xl p-3 md:p-4 lg:p-6">
+                    <div className="flex items-start">
+                      <div className="p-2 md:p-3 bg-green-100 rounded-lg md:rounded-xl mr-2 md:mr-4">
+                        <FiCheck className="h-5 w-5 md:h-7 md:w-7 text-green-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-base md:text-xl font-bold text-gray-900">Campaign Ready to Launch! 🚀</h4>
+                        <p className="text-xs md:text-sm text-gray-600 mt-1 md:mt-2">
+                          Your campaign has been configured successfully. Review the details below and create your campaign.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4 lg:gap-6">
+                    {/* Campaign Summary */}
+                    <div className="bg-white border border-gray-200 rounded-lg md:rounded-xl p-3 md:p-4 lg:p-5">
+                      <h5 className="font-semibold text-gray-900 text-sm md:text-base mb-2 md:mb-4 flex items-center">
+                        <FiPackage className="mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+                        Campaign Summary
+                      </h5>
+                      <div className="space-y-2 md:space-y-4">
+                        <div>
+                          <label className="text-xs md:text-sm text-gray-600">Campaign Name</label>
+                          <p className="font-medium text-sm md:text-lg text-gray-900 truncate">{formData.name}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 md:gap-4">
+                          <div>
+                            <label className="text-xs md:text-sm text-gray-600">Total Recipients</label>
+                            <p className="font-bold text-xl md:text-2xl text-indigo-600">{getTotalEmails()}</p>
+                          </div>
+                          <div>
+                            <label className="text-xs md:text-sm text-gray-600">Accounts Used</label>
+                            <p className="font-bold text-xl md:text-2xl text-green-600">
+                              {formData.allocations.filter(a => a.allocated_emails > 0).length}
                             </p>
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Step 2: Table-based Manual Allocation */}
-          {step === 2 && (
-            <div className="space-y-6">
-              <h4 className="font-medium text-gray-900">Manual Email Allocation</h4>
-              
-              {/* Allocation Summary */}
-              <div className={`border rounded-md p-4 ${
-                getTotalAllocated() === getTotalEmails() 
-                  ? 'bg-green-50 border-green-200' 
-                  : 'bg-blue-50 border-blue-200'
-              }`}>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">
-                      Total Emails to Distribute: {getTotalEmails()}
-                    </p>
-                    <p className={`text-sm ${
-                      getTotalAllocated() === getTotalEmails() 
-                        ? 'text-green-600 font-semibold' 
-                        : 'text-blue-600'
-                    }`}>
-                      Currently Allocated: {getTotalAllocated()} / {getTotalEmails()}
-                    </p>
-                    {getTotalAllocated() < getTotalEmails() && (
-                      <p className="text-sm text-orange-600 mt-1">
-                        ⚠️ You must allocate all {getTotalEmails()} emails before proceeding
-                      </p>
-                    )}
-                  </div>
-                  {getTotalAllocated() !== getTotalEmails() && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                      {getTotalEmails() - getTotalAllocated()} remaining
-                    </span>
-                  )}
-                  {getTotalAllocated() === getTotalEmails() && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      ✓ All emails allocated
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Bulk Allocation Controls */}
-              <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                <div className="flex flex-wrap gap-4 items-center">
-                  <div className="flex-1 min-w-[200px]">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Bulk Allocation
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        min="1"
-                        placeholder="Enter number of emails"
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                        value={bulkAllocation}
-                        onChange={(e) => setBulkAllocation(e.target.value)}
-                      />
-                      <button
-                        type="button"
-                        onClick={handleBulkAllocation}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
-                      >
-                        Apply to Selected
-                      </button>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {getSelectedAccounts().length} account(s) selected
-                    </p>
-                  </div>
 
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleSelectAll(true)}
-                      className="px-3 py-2 text-xs border border-gray-300 rounded hover:bg-gray-50"
-                    >
-                      Select All
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleSelectAll(false)}
-                      className="px-3 py-2 text-xs border border-gray-300 rounded hover:bg-gray-50"
-                    >
-                      Deselect All
-                    </button>
-                  </div>
-                </div>
-
-                {/* Quick Allocation Buttons */}
-                <div className="border-t pt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Quick Allocation Strategies
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => applyQuickAllocation('equal')}
-                      className="px-3 py-2 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-                    >
-                      Distribute Equally
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => applyQuickAllocation('capacity')}
-                      className="px-3 py-2 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
-                    >
-                      Distribute by Capacity
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => applyQuickAllocation('fill')}
-                      className="px-3 py-2 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
-                    >
-                      Fill Sequentially
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleSelectAll(false)
-                        setFormData(prev => ({
-                          ...prev,
-                          allocations: prev.allocations.map(acc => ({ ...acc, allocated_emails: 0 }))
-                        }))
-                      }}
-                      className="px-3 py-2 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
-                    >
-                      Clear All Allocations
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Search and Filter */}
-              <div className="flex justify-between items-center">
-                <div className="flex-1 max-w-md">
-                  <input
-                    type="text"
-                    placeholder="Search accounts by name or email..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-                <div className="text-sm text-gray-500">
-                  Showing {filteredAccounts.length} of {formData.allocations.length} accounts
-                </div>
-              </div>
-
-              {/* Accounts Table */}
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
-                          <input
-                            type="checkbox"
-                            className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                            checked={formData.allocations.length > 0 && formData.allocations.every(acc => acc.selected)}
-                            onChange={(e) => handleSelectAll(e.target.checked)}
+                    {/* Allocation Summary */}
+                    <div className="bg-white border border-gray-200 rounded-lg md:rounded-xl p-3 md:p-4 lg:p-5">
+                      <h5 className="font-semibold text-gray-900 text-sm md:text-base mb-2 md:mb-4 flex items-center">
+                        <FiTarget className="mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+                        Allocation Summary
+                      </h5>
+                      <div className="space-y-2 md:space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs md:text-sm text-gray-600">Total Allocated</span>
+                          <span className="font-bold text-green-600 text-sm md:text-base">{getTotalAllocated()} emails</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs md:text-sm text-gray-600">Distribution Method</span>
+                          <span className="font-medium text-xs md:text-sm">Manual Allocation</span>
+                        </div>
+                        <div className="pt-2 md:pt-3 border-t border-gray-100">
+                          <ProgressBar
+                            current={getTotalAllocated()}
+                            total={getTotalEmails()}
+                            label="Allocation Progress"
                           />
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Account
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Capacity
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Available
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
-                          Allocate
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Status
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredAccounts.map((account) => (
-                        <tr key={account.account_id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <input
-                              type="checkbox"
-                              className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                              checked={account.selected || false}
-                              onChange={(e) => handleSelectAccount(account.account_id, e.target.checked)}
-                            />
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <div>
-                              <div className="text-sm font-medium text-gray-900">
-                                {account.sender_name}
-                              </div>
-                              <div className="text-sm text-gray-500">
-                                {account.email}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {account.sent_today}/{account.daily_limit}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <div className="text-sm font-medium text-green-600">
-                              {account.available_capacity}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <div className="flex items-center space-x-2">
-                              <input
-                                type="number"
-                                min="0"
-                                max={Math.min(account.available_capacity, getTotalEmails() - getTotalAllocated() + account.allocated_emails)}
-                                className="w-20 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                                value={account.allocated_emails}
-                                onChange={(e) => handleAllocationChange(account.account_id, e.target.value)}
-                              />
-                              <span className="text-xs text-gray-500">
-                                / {account.available_capacity}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            {account.allocated_emails > account.available_capacity ? (
-                              <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
-                                Over capacity
-                              </span>
-                            ) : account.allocated_emails > 0 ? (
-                              <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                                Allocated
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
-                                Not allocated
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
-              {filteredAccounts.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  No accounts match your search criteria
+                  {/* Account Allocations Detail */}
+                  <div className="bg-white border border-gray-200 rounded-lg md:rounded-xl overflow-hidden">
+                    <div className="bg-gray-50 px-3 md:px-4 lg:px-5 py-2 md:py-3 border-b border-gray-200">
+                      <h5 className="font-semibold text-gray-900 text-sm md:text-base flex items-center">
+                        <FiUsers className="mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+                        Account Allocations ({formData.allocations.filter(a => a.allocated_emails > 0).length})
+                      </h5>
+                    </div>
+                    <div className="divide-y max-h-48 md:max-h-64 overflow-y-auto">
+                      {formData.allocations
+                        .filter(allocation => allocation.allocated_emails > 0)
+                        .map((allocation, index) => (
+                          <div key={allocation.account_id} className="p-2 md:p-3 lg:p-4 hover:bg-gray-50">
+                            <div className="flex justify-between items-center">
+                              <div className="flex items-center space-x-2 md:space-x-3 min-w-0 flex-1">
+                                <div className="p-1.5 md:p-2 bg-indigo-50 rounded-lg flex-shrink-0">
+                                  <TbMail className="h-3 w-3 md:h-4 md:w-4 lg:h-5 lg:w-5 text-indigo-600" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-medium text-gray-900 text-xs md:text-sm truncate">{allocation.sender_name}</p>
+                                  <p className="text-xs text-gray-600 truncate">{allocation.email}</p>
+                                </div>
+                              </div>
+                              <div className="text-right ml-2 flex-shrink-0">
+                                <p className="text-sm md:text-base lg:text-lg font-bold text-indigo-600 whitespace-nowrap">
+                                  {allocation.allocated_emails} emails
+                                </p>
+                                <p className="text-xs text-gray-500 whitespace-nowrap">
+                                  Daily limit: {allocation.available_capacity}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
-          )}
+          </div>
 
-          {/* Step 3: Review */}
-          {step === 3 && (
-            <div className="space-y-6">
-              <h4 className="font-medium text-gray-900">Review & Save</h4>
-              
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <h5 className="font-medium text-gray-900 mb-3">✓ Campaign Ready</h5>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-600">Campaign Name:</span>
-                    <p className="font-medium">{formData.name}</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Total Emails:</span>
-                    <p className="font-medium">{getTotalEmails()}</p>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Accounts Used:</span>
-                    <p className="font-medium">
-                      {formData.allocations.filter(a => a.allocated_emails > 0).length}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Total Allocated:</span>
-                    <p className="font-medium text-green-600">{getTotalAllocated()}</p>
-                  </div>
+          {/* Footer */}
+          <div className="border-t border-gray-200 p-3 md:p-4 lg:p-6 bg-white">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => step > 1 ? setStep(step - 1) : handleClose()}
+                className="flex items-center px-3 md:px-4 lg:px-5 py-1.5 md:py-2 lg:py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors text-sm"
+              >
+                <FiChevronLeft className="mr-1.5 h-3 w-3 md:h-4 md:w-4" />
+                {step > 1 ? 'Back' : 'Cancel'}
+              </button>
+              <div className="flex items-center space-x-2 md:space-x-3 lg:space-x-4">
+                <div className="text-xs md:text-sm text-gray-600 whitespace-nowrap">
+                  Step {step} of 3
                 </div>
-              </div>
-
-              <div className="border rounded-lg">
-                <div className="bg-gray-50 px-4 py-2 border-b">
-                  <h5 className="font-medium text-gray-900">Allocation Details</h5>
-                </div>
-                <div className="divide-y max-h-60 overflow-y-auto">
-                  {formData.allocations
-                    .filter(allocation => allocation.allocated_emails > 0)
-                    .map((allocation, index) => (
-                      <div key={allocation.account_id} className="px-4 py-3">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <p className="font-medium">{allocation.sender_name}</p>
-                            <p className="text-sm text-gray-600">{allocation.email}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium text-indigo-600">
-                              {allocation.allocated_emails} emails
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              Daily limit: {allocation.available_capacity} emails
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                </div>
+                <button
+                  type="button"
+                  onClick={handleNextStep}
+                  disabled={loading || (step === 2 && getTotalAllocated() !== getTotalEmails())}
+                  className="flex items-center px-4 md:px-5 lg:px-6 py-1.5 md:py-2 lg:py-3 text-white bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-lg hover:from-indigo-700 hover:to-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 text-sm"
+                >
+                  {loading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-3 w-3 md:h-4 md:w-4 border-b-2 border-white mr-1.5 md:mr-2"></div>
+                      Creating...
+                    </>
+                  ) : step < 3 ? (
+                    <>
+                      Continue
+                      <FiChevronRight className="ml-1.5 md:ml-2 h-3 w-3 md:h-4 md:w-4" />
+                    </>
+                  ) : (
+                    <>
+                      <FiCheck className="mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+                      Create Campaign
+                    </>
+                  )}
+                </button>
               </div>
             </div>
-          )}
-
-          {/* Navigation Buttons */}
-          <div className="flex justify-between pt-6 border-t">
-            <button
-              type="button"
-              onClick={() => step > 1 ? setStep(step - 1) : handleClose()}
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
-            >
-              {step > 1 ? 'Back' : 'Cancel'}
-            </button>
-            <button
-              type="button"
-              onClick={handleNextStep}
-              disabled={loading || (step === 2 && getTotalAllocated() !== getTotalEmails())}
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Saving...' : step < 3 ? 'Next' : 'Create Campaign'}
-            </button>
           </div>
         </div>
       </div>

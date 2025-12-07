@@ -1,11 +1,126 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../components/AuthProvider'
 import TaskDetailsModal from './components/TaskDetailsModal'
 import CreateTaskModal from '../../../components/CreateTaskModal'
+import {
+  FiArrowLeft,
+  FiMail,
+  FiMessageSquare,
+  FiPlus,
+  FiCalendar,
+  FiEdit2,
+  FiEye,
+  FiFileText,
+  FiClock,
+  FiCheckCircle,
+  FiPauseCircle,
+  FiPlayCircle,
+  FiAlertCircle,
+  FiRefreshCw,
+  FiExternalLink,
+  FiChevronRight,
+  FiFilter,
+  FiTrendingUp
+} from 'react-icons/fi'
+import {
+  HiOutlineMail,
+  HiOutlineChatAlt2,
+  HiOutlineCalendar,
+  HiOutlineDocumentText,
+  HiOutlineStatusOnline,
+  HiOutlineTag
+} from 'react-icons/hi'
+import { TbMail, TbMessages } from 'react-icons/tb'
+
+// Custom components
+const LoadingSpinner = () => (
+  <div className="flex flex-col items-center justify-center min-h-96 space-y-4">
+    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+    <p className="text-gray-500">Loading outbound details...</p>
+  </div>
+)
+
+const ErrorState = ({ error, onBack }) => (
+  <div className="space-y-4">
+    <button
+      onClick={onBack}
+      className="flex items-center text-sm text-indigo-600 hover:text-indigo-500 transition-colors"
+    >
+      <FiArrowLeft className="mr-2" />
+      Back to Outbounds
+    </button>
+    <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded">
+      <div className="flex">
+        <FiAlertCircle className="h-5 w-5 text-red-400 mr-3" />
+        <div>
+          <p className="text-red-800 font-medium">Error loading outbound</p>
+          <p className="text-red-700 mt-1">{error}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+)
+
+const StatCard = ({ icon: Icon, label, value, color = 'blue', isLoading = false }) => (
+  <div className={`bg-white rounded-xl p-5 shadow-sm border border-gray-200 hover:shadow-md transition-shadow`}>
+    <div className="flex items-start justify-between">
+      <div>
+        <p className="text-sm text-gray-600 mb-1">{label}</p>
+        {isLoading ? (
+          <div className="h-8 w-20 bg-gray-200 rounded animate-pulse"></div>
+        ) : (
+          <p className="text-2xl font-bold text-gray-900">{value.toLocaleString()}</p>
+        )}
+      </div>
+      <div className={`p-3 rounded-lg bg-${color}-50`}>
+        <Icon className={`h-6 w-6 text-${color}-600`} />
+      </div>
+    </div>
+  </div>
+)
+
+const TaskStatusBadge = ({ status }) => {
+  const config = {
+    scheduled: { color: 'bg-blue-100 text-blue-800', icon: FiClock },
+    in_progress: { color: 'bg-yellow-100 text-yellow-800', icon: FiRefreshCw },
+    completed: { color: 'bg-green-100 text-green-800', icon: FiCheckCircle },
+    failed: { color: 'bg-red-100 text-red-800', icon: FiAlertCircle },
+    paused: { color: 'bg-gray-100 text-gray-800', icon: FiPauseCircle },
+  }
+
+  const { color, icon: Icon } = config[status] || config.scheduled
+  const label = status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')
+
+  return (
+    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${color}`}>
+      <Icon className="mr-1.5 h-3.5 w-3.5" />
+      {label}
+    </span>
+  )
+}
+
+const ActionButton = ({ icon: Icon, label, onClick, variant = 'primary', className = '' }) => {
+  const variants = {
+    primary: 'bg-indigo-600 hover:bg-indigo-700 text-white',
+    secondary: 'bg-white border border-gray-300 hover:bg-gray-50 text-gray-700',
+    success: 'bg-green-600 hover:bg-green-700 text-white',
+    blue: 'bg-blue-600 hover:bg-blue-700 text-white',
+  }
+
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ${variants[variant]} ${className}`}
+    >
+      <Icon className="mr-2 h-4 w-4" />
+      {label}
+    </button>
+  )
+}
 
 export default function OutboundDetailPage() {
   const params = useParams()
@@ -18,24 +133,23 @@ export default function OutboundDetailPage() {
   const [selectedTask, setSelectedTask] = useState(null)
   const [selectedTaskAllocations, setSelectedTaskAllocations] = useState([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
   const [outboundStats, setOutboundStats] = useState({
     totalSent: 0,
-    totalReplies: 0
+    totalReplies: 0,
+    pending: 0,
+    successRate: 0,
   })
 
   // Modal state
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false)
 
-  useEffect(() => {
+  const fetchOutboundAndTasks = useCallback(async () => {
     if (!user || !outboundId) return
-    fetchOutboundAndTasks()
-    fetchOutboundStats()
-  }, [user, outboundId])
 
-  const fetchOutboundAndTasks = async () => {
-    setLoading(true)
+    setRefreshing(true)
     setError('')
 
     try {
@@ -51,6 +165,7 @@ export default function OutboundDetailPage() {
       if (!outboundData) {
         setError('Outbound not found or you do not have access to it.')
         setLoading(false)
+        setRefreshing(false)
         return
       }
 
@@ -68,18 +183,16 @@ export default function OutboundDetailPage() {
       setTasks(tasksData || [])
     } catch (err) {
       console.error('Error loading outbound detail:', err)
-      const message =
-        err?.message ||
-        err?.hint ||
-        err?.details ||
-        'Failed to load outbound details.'
-      setError(message)
+      setError(err.message || 'Failed to load outbound details.')
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
-  }
+  }, [user, outboundId])
 
-  const fetchOutboundStats = async () => {
+  const fetchOutboundStats = useCallback(async () => {
+    if (!user || !outboundId) return
+
     try {
       // Get total emails sent for this outbound
       const { data: sentData, error: sentError } = await supabase
@@ -91,6 +204,14 @@ export default function OutboundDetailPage() {
 
       if (sentError) throw sentError
 
+      // Get pending emails
+      const { data: pendingData } = await supabase
+        .from('email_queue')
+        .select('id', { count: 'exact', head: true })
+        .eq('outbound_id', outboundId)
+        .eq('user_id', user.id)
+        .in('status', ['pending', 'scheduled'])
+
       // Get total replies for this outbound
       const { data: repliesData, error: repliesError } = await supabase
         .from('replies')
@@ -100,14 +221,26 @@ export default function OutboundDetailPage() {
 
       if (repliesError) throw repliesError
 
+      const totalSent = sentData?.count || 0
+      const totalReplies = repliesData?.count || 0
+      const successRate = totalSent > 0 ? Math.round((totalReplies / totalSent) * 100) : 0
+
       setOutboundStats({
-        totalSent: sentData?.count || 0,
-        totalReplies: repliesData?.count || 0
+        totalSent,
+        totalReplies,
+        pending: pendingData?.count || 0,
+        successRate,
       })
     } catch (err) {
       console.error('Error fetching outbound stats:', err)
     }
-  }
+  }, [user, outboundId])
+
+  useEffect(() => {
+    if (!user || !outboundId) return
+    fetchOutboundAndTasks()
+    fetchOutboundStats()
+  }, [user, outboundId, fetchOutboundAndTasks, fetchOutboundStats])
 
   const loadTaskWithAllocations = async (task) => {
     try {
@@ -169,318 +302,211 @@ export default function OutboundDetailPage() {
     router.push(`/dashboard/outbounds/${outboundId}/replies`)
   }
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800'
-      case 'paused':
-        return 'bg-yellow-100 text-yellow-800'
-      case 'completed':
-        return 'bg-blue-100 text-blue-800'
-      case 'failed':
-        return 'bg-red-100 text-red-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
-    }
+  const handleRefresh = () => {
+    fetchOutboundAndTasks()
+    fetchOutboundStats()
   }
 
-  const getTaskStatusColor = (status) => {
-    switch (status) {
-      case 'scheduled':
-        return 'bg-blue-100 text-blue-800'
-      case 'in_progress':
-        return 'bg-yellow-100 text-yellow-800'
-      case 'completed':
-        return 'bg-green-100 text-green-800'
-      case 'failed':
-        return 'bg-red-100 text-red-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="space-y-4">
-        <button
-          onClick={() => router.push('/dashboard/outbounds')}
-          className="text-sm text-indigo-600 hover:text-indigo-500"
-        >
-          ← Back to Outbounds
-        </button>
-        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
-          {error}
-        </div>
-      </div>
-    )
-  }
-
+  if (loading) return <LoadingSpinner />
+  if (error) return <ErrorState error={error} onBack={() => router.push('/dashboard/outbounds')} />
   if (!outbound) return null
 
   return (
-    <div className="space-y-8">
-      {/* Back button */}
-      <button
-        onClick={() => router.push('/dashboard/outbounds')}
-        className="text-sm text-indigo-600 hover:text-indigo-500"
-      >
-        ← Back to Outbounds
-      </button>
+    <div className="space-y-6 max-w-7xl mx-auto px-2 sm:px-2 lg:px-8 py-2">
+      {/* Header with back button and refresh */}
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => router.push('/dashboard/outbounds')}
+          className="inline-flex items-center text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+        >
+          <FiArrowLeft className="mr-2 h-4 w-4" />
+          Back to Outbounds
+        </button>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 transition-colors disabled:opacity-50"
+        >
+          <FiRefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          {refreshing ? 'Refreshing...' : 'Refresh'}
+        </button>
+      </div>
 
-      {/* Outbound header with stats */}
-      <div className="bg-white shadow rounded-lg p-6">
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">{outbound.name}</h1>
-              <p className="text-gray-500 mt-1">
-                Created on {new Date(outbound.created_at).toLocaleString()}
-              </p>
-            </div>
-            <span
-              className={`px-3 py-1 text-xs rounded-full font-semibold ${getStatusColor(outbound.status)}`}
-            >
-              {outbound.status.charAt(0).toUpperCase() + outbound.status.slice(1)}
-            </span>
-          </div>
-
-          {/* Stats cards - Now only 2 cards (Total Sent and Total Replies) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">Total Sent</p>
-                  <p className="text-2xl font-bold text-gray-900">{outboundStats.totalSent}</p>
+      {/* Outbound header */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-3">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+          <div className="flex-1">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-indigo-50 rounded-xl">
+                <HiOutlineDocumentText className="h-8 w-8 text-indigo-600" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h1 className="text-2xl font-bold text-gray-900">{outbound.name}</h1>
+                  <span className={`px-3 py-1 text-xs font-medium rounded-full ${
+                    outbound.status === 'active' ? 'bg-green-100 text-green-800' :
+                    outbound.status === 'paused' ? 'bg-yellow-100 text-yellow-800' :
+                    outbound.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {outbound.status.charAt(0).toUpperCase() + outbound.status.slice(1)}
+                  </span>
                 </div>
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
+              
+                <div className="flex items-center gap-4 mt-4 text-sm text-gray-500">
+                  <span className="flex items-center">
+                    <FiCalendar className="mr-1.5 h-4 w-4" />
+                    Created {new Date(outbound.created_at).toLocaleDateString()}
+                  </span>
+                  {outbound.updated_at && (
+                    <span className="flex items-center">
+                      <FiClock className="mr-1.5 h-4 w-4" />
+                      Updated {new Date(outbound.updated_at).toLocaleDateString()}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
-            
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">Total Replies</p>
-                  <p className="text-2xl font-bold text-gray-900">{outboundStats.totalReplies}</p>
-                </div>
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
           </div>
+          
+         
+        </div>
 
-          {/* Action buttons */}
-          <div className="flex flex-wrap gap-3 mt-4">
-            <button
-              onClick={navigateToEmailList}
-              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center gap-2 transition-colors"
-            >
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                className="h-4 w-4" 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-              >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth={2} 
-                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" 
-                />
-              </svg>
-              View Email List
-            </button>
-            
-            <button
-              onClick={navigateToReplies}
-              className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 flex items-center gap-2 transition-colors"
-            >
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                className="h-4 w-4" 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-              >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth={2} 
-                  d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" 
-                />
-              </svg>
-              View Replies
-            </button>
-            
-            <button
-              onClick={() => setIsCreateTaskModalOpen(true)}
-              className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 flex items-center gap-2 transition-colors"
-            >
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                className="h-4 w-4" 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-              >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth={2} 
-                  d="M12 4v16m8-8H4" 
-                />
-              </svg>
-              Create New Task
-            </button>
-          </div>
+     
+
+        {/* Quick actions */}
+        <div className="flex flex-wrap gap-3 mt-8 pt-6 border-t border-gray-200">
+          <ActionButton
+            icon={HiOutlineMail}
+            label="View Email List"
+            onClick={navigateToEmailList}
+            variant="blue"
+          />
+          <ActionButton
+            icon={HiOutlineChatAlt2}
+            label="View Replies"
+            onClick={navigateToReplies}
+            variant="success"
+          />
+          <ActionButton
+            icon={FiPlus}
+            label="Create Task"
+            onClick={() => setIsCreateTaskModalOpen(true)}
+            variant="primary"
+          />
+         
         </div>
       </div>
 
       {/* Tasks section */}
-      <div className="bg-white shadow rounded-lg overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-6 border-b border-gray-200">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Tasks</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                Manage email sending tasks for this outbound campaign
-              </p>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-50 rounded-lg">
+                <HiOutlineCalendar className="h-5 w-5 text-indigo-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Tasks</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Manage email sending tasks for this campaign
+                </p>
+              </div>
             </div>
-            <div className="flex items-center gap-4">
-              <p className="text-sm text-gray-500">
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-600">
                 {tasks.length} task{tasks.length === 1 ? '' : 's'}
-              </p>
-              <button
+              </span>
+              {/* <ActionButton
+                icon={FiPlus}
+                label="New Task"
                 onClick={() => setIsCreateTaskModalOpen(true)}
-                className="px-3 py-1.5 text-sm rounded-md bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
-              >
-                + New Task
-              </button>
+                variant="primary"
+              /> */}
             </div>
           </div>
         </div>
 
         {tasks.length === 0 ? (
-          <div className="text-center py-12">
-            <svg
-              className="mx-auto h-12 w-12 text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1}
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-              />
-            </svg>
+          <div className="text-center py-12 px-4">
+            <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
+              <HiOutlineCalendar className="h-8 w-8 text-gray-400" />
+            </div>
             <h3 className="mt-4 text-lg font-medium text-gray-900">No tasks yet</h3>
             <p className="mt-2 text-sm text-gray-500 max-w-md mx-auto">
-              Get started by creating your first email sending task. Tasks allow you to schedule and manage email campaigns.
+              Create your first email sending task to start this campaign. Tasks allow you to schedule and manage email delivery.
             </p>
-            <button
+            <ActionButton
+              icon={FiPlus}
+              label="Create your first task"
               onClick={() => setIsCreateTaskModalOpen(true)}
-              className="mt-6 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors"
-            >
-              Create your first task
-            </button>
+              variant="primary"
+              className="mt-6"
+            />
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Task Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Type
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Scheduled At
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {tasks.map((task) => (
-                  <tr key={task.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center">
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{task.name}</div>
-                          <div className="text-sm text-gray-500">
-                            Created {new Date(task.created_at).toLocaleDateString()}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        task.type === 'followup' 
-                          ? 'bg-purple-100 text-purple-800' 
-                          : 'bg-blue-100 text-blue-800'
-                      }`}>
+          <div className="divide-y divide-gray-200">
+            {tasks.map((task) => (
+              <div
+                key={task.id}
+                className="p-6 hover:bg-gray-50 transition-colors cursor-pointer"
+                onClick={() => loadTaskWithAllocations(task)}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="font-medium text-gray-900">{task.name}</h3>
+                      <TaskStatusBadge status={task.status} />
+                    </div>
+                    <p className="text-sm text-gray-600 mb-3">
+                      {task.description || 'No description provided'}
+                    </p>
+                    <div className="flex flex-wrap gap-4 text-sm text-gray-500">
+                      <span className="flex items-center">
+                        <HiOutlineTag className="mr-1.5 h-4 w-4" />
                         {task.type === 'followup' ? 'Follow-up' : 'Initial'}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {task.scheduled_at
-                        ? new Date(task.scheduled_at).toLocaleString()
-                        : 'Not scheduled'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getTaskStatusColor(task.status)}`}>
-                        {task.status.charAt(0).toUpperCase() + task.status.slice(1)}
+                      {task.scheduled_at && (
+                        <span className="flex items-center">
+                          <FiCalendar className="mr-1.5 h-4 w-4" />
+                          {new Date(task.scheduled_at).toLocaleString()}
+                        </span>
+                      )}
+                      <span className="flex items-center">
+                        <HiOutlineStatusOnline className="mr-1.5 h-4 w-4" />
+                        Created {new Date(task.created_at).toLocaleDateString()}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button
-                        onClick={() => loadTaskWithAllocations(task)}
-                        className="text-indigo-600 hover:text-indigo-900 mr-4 transition-colors"
-                      >
-                        View Details
-                      </button>
-                      <button
-                        onClick={() => {
-                          // Add edit functionality here if needed
-                          console.log('Edit task:', task.id)
-                        }}
-                        className="text-gray-600 hover:text-gray-900 transition-colors"
-                      >
-                        Edit
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        loadTaskWithAllocations(task)
+                      }}
+                      className="inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+                    >
+                      View Details
+                      <FiChevronRight className="ml-1 h-4 w-4" />
+                    </button>
+                    {/* <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        // Edit functionality here
+                      }}
+                      className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                    >
+                      <FiEdit2 className="h-4 w-4" />
+                    </button> */}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
 
-      {/* Task Details Modal */}
+      {/* Modals */}
       {isTaskModalOpen && (
         <TaskDetailsModal
           onClose={() => setIsTaskModalOpen(false)}
@@ -490,15 +516,14 @@ export default function OutboundDetailPage() {
         />
       )}
 
-      {/* Create Task Modal */}
       {isCreateTaskModalOpen && outbound && (
         <CreateTaskModal
           isOpen={isCreateTaskModalOpen}
           onClose={() => setIsCreateTaskModalOpen(false)}
           onSuccess={() => {
             setIsCreateTaskModalOpen(false)
-            fetchOutboundAndTasks() // Refresh tasks after creating a new one
-            fetchOutboundStats() // Refresh stats too
+            fetchOutboundAndTasks()
+            fetchOutboundStats()
           }}
           outbound={outbound}
         />
