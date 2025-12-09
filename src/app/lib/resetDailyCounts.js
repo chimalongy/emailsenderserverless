@@ -9,16 +9,19 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.
  * @returns {Object} - Account object with potentially reset sent_today
  */
 export function shouldResetDailyCount(account) {
+  // If we don't know when the last send happened, default to 0 so we don't block sends
   if (!account || !account.last_sent) {
     return { ...account, sent_today: 0 }
   }
 
   const lastSent = new Date(account.last_sent)
-  const now = new Date()
-  const hoursSinceLastSent = (now - lastSent) / (1000 * 60 * 60) // Convert to hours
 
-  // If 24 hours or more have passed, reset sent_today to 0
-  if (hoursSinceLastSent >= 24) {
+  // Calculate the start of the current day in UTC (00:00:00)
+  const now = new Date()
+  const startOfTodayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0))
+
+  // If the last send happened before the start of today, reset the counter
+  if (lastSent < startOfTodayUtc) {
     return { ...account, sent_today: 0 }
   }
 
@@ -44,8 +47,6 @@ export async function resetDailyCountsIfNeeded(accountId = null) {
     let query = supabase
       .from('email_accounts')
       .select('id, last_sent, sent_today')
-      .not('last_sent', 'is', null)
-      .gt('sent_today', 0)
 
     if (accountId) {
       query = query.eq('id', accountId)
@@ -61,13 +62,13 @@ export async function resetDailyCountsIfNeeded(accountId = null) {
       return { success: true, resetCount: 0 }
     }
 
-    // Filter accounts where 24 hours have passed
+    // Filter accounts where the last send happened before today
     const now = new Date()
+    const startOfTodayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0))
     const accountsToReset = accounts.filter((account) => {
-      if (!account.last_sent) return false
+      if (!account.last_sent) return true
       const lastSent = new Date(account.last_sent)
-      const hoursSinceLastSent = (now - lastSent) / (1000 * 60 * 60)
-      return hoursSinceLastSent >= 24
+      return lastSent < startOfTodayUtc
     })
 
     if (accountsToReset.length === 0) {
