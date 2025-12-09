@@ -21,27 +21,21 @@ function extractMessageParts(payload, bodies = []) {
   return bodies;
 }
 
-// Search for known emails inside body text
-function findEmailsInText(list, body) {
-  const text = body.toLowerCase();
-  return list.find(email => text.includes(email.toLowerCase())) || null;
-}
-
-export async function readBouncedEmails(
+export async function readEmails(
   emailAddress,
   list,
   refreshToken,
-  accessToken
+  accessToken,
+  subject
 ) {
-  console.log("READING BOUNCE EMAILS");
-
+  console.log(" READING REPLIES")
   try {
     const oAuth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
       process.env.GOOGLE_REDIRECT_URI
     );
-
+  
     oAuth2Client.setCredentials({
       access_token: accessToken,
       refresh_token: refreshToken,
@@ -51,19 +45,15 @@ export async function readBouncedEmails(
 
     let fetchedEmails = [];
     let nextPageToken = null;
-
     let emailsFetched = 0;
-    const maxEmails = 30;
+    const maxEmails = 30; // Fetch first 30 items
 
-    // Bounce messages
-    const searchQuery =
-      `in:inbox -in:spam -in:trash ` +
-      `from:(mailer-daemon OR "mail delivery subsystem" OR postmaster)`;
+    const searchQuery = `in:inbox -in:spam -in:trash`;
 
     do {
-      // Respect remaining allowed emails
-      const remaining = maxEmails - emailsFetched;
-      const batchSize = Math.min(remaining, 50);
+      const remainingEmails = maxEmails - emailsFetched;
+      const batchSize = Math.min(remainingEmails, 50);
+
       if (batchSize <= 0) break;
 
       const listRes = await gmail.users.messages.list({
@@ -75,9 +65,9 @@ export async function readBouncedEmails(
       });
 
       const messages = listRes.data.messages || [];
+
       if (messages.length === 0) break;
 
-      // Fetch details
       const messageDetails = await Promise.allSettled(
         messages.map((msg) =>
           gmail.users.messages.get({
@@ -95,45 +85,33 @@ export async function readBouncedEmails(
         const payload = msgData.payload;
         const headers = payload.headers || [];
 
-        const from =
-          headers.find((h) => h.name.toLowerCase() === "from")?.value || "";
-        const subject =
-          headers.find((h) => h.name.toLowerCase() === "subject")?.value || "";
-        const date =
-          headers.find((h) => h.name.toLowerCase() === "date")?.value || "";
-        const inReplyTo =
-          headers.find((h) => h.name.toLowerCase() === "in-reply-to")?.value ||
-          "";
-        const messageId =
-          headers.find((h) => h.name.toLowerCase() === "message-id")?.value ||
-          "";
+        const from = headers.find(h => h.name.toLowerCase() === "from")?.value || "";
+        const msgSubject = headers.find(h => h.name.toLowerCase() === "subject")?.value || "";
+        const date = headers.find(h => h.name.toLowerCase() === "date")?.value || "";
+        const inReplyTo = headers.find(h => h.name.toLowerCase() === "in-reply-to")?.value || "";
+        const messageId = headers.find(h => h.name.toLowerCase() === "message-id")?.value || "";
+        const to = headers.find(h => h.name.toLowerCase() === "to")?.value || "";
 
-        // Extract body parts
+        // Extract bodies
         const allBodies = extractMessageParts(payload);
-        const plainText =
-          allBodies.find((p) => p.mimeType === "text/plain")?.body || "";
-        const htmlText =
-          allBodies.find((p) => p.mimeType === "text/html")?.body || "";
-        const fullBody = allBodies
-          .map((p) => `\n--- ${p.mimeType} ---\n${p.body}`)
-          .join("\n");
+        const plainText = allBodies.find(p => p.mimeType === "text/plain")?.body || "";
+        const htmlText = allBodies.find(p => p.mimeType === "text/html")?.body || "";
+        const fullBody = allBodies.map(p => `\n--- ${p.mimeType} ---\n${p.body}`).join("\n");
 
-        // Pack message
-        const emailObj = {
+        fetchedEmails.push({
           id: msgData.id,
           threadId: msgData.threadId,
           from,
-          subject,
-          to: emailAddress,
+          subject: msgSubject,
+          to: to || emailAddress,
           date,
           plainText,
           htmlText,
           fullBody,
           messageId,
           inReplyTo,
-        };
+        });
 
-        fetchedEmails.push(emailObj);
         emailsFetched++;
         if (emailsFetched >= maxEmails) break;
       }
@@ -141,24 +119,15 @@ export async function readBouncedEmails(
       nextPageToken = listRes.data.nextPageToken;
 
       if (emailsFetched >= maxEmails) break;
+
     } while (nextPageToken);
 
-    console.log(`Fetched ${fetchedEmails.length} bounce emails for ${emailAddress}`);
+    console.log(`Fetched ${fetchedEmails.length} emails from inbox for ${emailAddress}`);
 
-    // Now match emails inside the bounce body
-    const filteredEmails = [];
+    return fetchedEmails;
 
-    for (const email of fetchedEmails) {
-      const result = findEmailsInText(list, email.fullBody);
-      if (result !== null) {
-        email.receiver = result;
-        filteredEmails.push(email);
-      }
-    }
-
-    return filteredEmails;
   } catch (error) {
-    console.error(`Error reading bounce emails for ${emailAddress}:`, error.message);
+    console.error(`Error reading emails for ${emailAddress}:`, error.message);
     return [];
   }
 }

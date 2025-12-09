@@ -1,9 +1,11 @@
 import { google } from "googleapis";
 
+
 // Recursive helper to extract all body parts
 function extractMessageParts(payload, bodies = []) {
   if (!payload) return bodies;
 
+  // If the current payload has body data
   if (payload.body?.data) {
     const decoded = Buffer.from(payload.body.data, "base64").toString("utf-8");
     bodies.push({
@@ -12,6 +14,7 @@ function extractMessageParts(payload, bodies = []) {
     });
   }
 
+  // If it has sub-parts (multipart/alternative, multipart/mixed, etc.)
   if (payload.parts) {
     for (const part of payload.parts) {
       extractMessageParts(part, bodies);
@@ -21,11 +24,12 @@ function extractMessageParts(payload, bodies = []) {
   return bodies;
 }
 
-// Search for known emails inside body text
 function findEmailsInText(list, body) {
-  const text = body.toLowerCase();
-  return list.find(email => text.includes(email.toLowerCase())) || null;
+  const str = body.toLowerCase();
+  return list.find(email => str.includes(email.toLowerCase())) || null;
 }
+
+
 
 export async function readBouncedEmails(
   emailAddress,
@@ -33,7 +37,9 @@ export async function readBouncedEmails(
   refreshToken,
   accessToken
 ) {
-  console.log("READING BOUNCE EMAILS");
+
+
+
 
   try {
     const oAuth2Client = new google.auth.OAuth2(
@@ -41,6 +47,7 @@ export async function readBouncedEmails(
       process.env.GOOGLE_CLIENT_SECRET,
       process.env.GOOGLE_REDIRECT_URI
     );
+  
 
     oAuth2Client.setCredentials({
       access_token: accessToken,
@@ -52,32 +59,21 @@ export async function readBouncedEmails(
     let fetchedEmails = [];
     let nextPageToken = null;
 
-    let emailsFetched = 0;
-    const maxEmails = 30;
-
-    // Bounce messages
-    const searchQuery =
-      `in:inbox -in:spam -in:trash ` +
-      `from:(mailer-daemon OR "mail delivery subsystem" OR postmaster)`;
+    // Gmail search query: only mail-daemon/postmaster
+    const searchQuery = `from:(mailer-daemon OR "mail delivery subsystem" OR postmaster)`;
 
     do {
-      // Respect remaining allowed emails
-      const remaining = maxEmails - emailsFetched;
-      const batchSize = Math.min(remaining, 50);
-      if (batchSize <= 0) break;
-
       const listRes = await gmail.users.messages.list({
         userId: "me",
-        maxResults: batchSize,
+        maxResults: 200,
         pageToken: nextPageToken || undefined,
         q: searchQuery,
         fields: "messages(id,threadId),nextPageToken",
       });
 
       const messages = listRes.data.messages || [];
-      if (messages.length === 0) break;
 
-      // Fetch details
+      // Fetch all details in parallel
       const messageDetails = await Promise.allSettled(
         messages.map((msg) =>
           gmail.users.messages.get({
@@ -90,14 +86,14 @@ export async function readBouncedEmails(
 
       for (const result of messageDetails) {
         if (result.status !== "fulfilled") continue;
-
         const msgData = result.value.data;
+
         const payload = msgData.payload;
         const headers = payload.headers || [];
 
         const from =
           headers.find((h) => h.name.toLowerCase() === "from")?.value || "";
-        const subject =
+        const msgSubject =
           headers.find((h) => h.name.toLowerCase() === "subject")?.value || "";
         const date =
           headers.find((h) => h.name.toLowerCase() === "date")?.value || "";
@@ -108,7 +104,7 @@ export async function readBouncedEmails(
           headers.find((h) => h.name.toLowerCase() === "message-id")?.value ||
           "";
 
-        // Extract body parts
+        // Extract all body parts
         const allBodies = extractMessageParts(payload);
         const plainText =
           allBodies.find((p) => p.mimeType === "text/plain")?.body || "";
@@ -118,12 +114,11 @@ export async function readBouncedEmails(
           .map((p) => `\n--- ${p.mimeType} ---\n${p.body}`)
           .join("\n");
 
-        // Pack message
-        const emailObj = {
+        fetchedEmails.push({
           id: msgData.id,
           threadId: msgData.threadId,
           from,
-          subject,
+          subject: msgSubject,
           to: emailAddress,
           date,
           plainText,
@@ -131,34 +126,37 @@ export async function readBouncedEmails(
           fullBody,
           messageId,
           inReplyTo,
-        };
-
-        fetchedEmails.push(emailObj);
-        emailsFetched++;
-        if (emailsFetched >= maxEmails) break;
+        });
       }
 
       nextPageToken = listRes.data.nextPageToken;
-
-      if (emailsFetched >= maxEmails) break;
     } while (nextPageToken);
 
-    console.log(`Fetched ${fetchedEmails.length} bounce emails for ${emailAddress}`);
+    console.log(
+      `Fetched ${fetchedEmails.length} emails from mail-daemon for ${emailAddress}`
+    );
 
-    // Now match emails inside the bounce body
-    const filteredEmails = [];
+    //find in the list
 
-    for (const email of fetchedEmails) {
-      const result = findEmailsInText(list, email.fullBody);
-      if (result !== null) {
-        email.receiver = result;
-        filteredEmails.push(email);
+    let filteredEmails=[]
+
+    for (let i = 0; i<fetchedEmails.length; i++){
+
+      let value= fetchedEmails[i]
+      
+      let result = findEmailsInText(list,value.fullBody )
+
+      if (result!==null){
+        value['receiver']= result
+
+        filteredEmails. push(value)
       }
+
     }
 
     return filteredEmails;
   } catch (error) {
-    console.error(`Error reading bounce emails for ${emailAddress}:`, error.message);
+    console.error(`Error reading emails for ${emailAddress}:`, error.message);
     return [];
   }
 }
