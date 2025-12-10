@@ -226,96 +226,96 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess, outbound }
     }
   }
 
-const scheduleEmailSending = async (outboundId, taskId) => {
-  try {
-    console.log('🚀 Scheduling emails via serverless QStash...')
-    console.log('Outbound ID:', outboundId)
-    console.log('Task ID:', taskId)
-    
-    // Get the scheduled_at from the task (it's already in ISO format/UTC)
-    const { data: taskData, error: taskFetchError } = await supabase
-      .from('tasks')
-      .select('scheduled_at, send_rate')
-      .eq('id', taskId)
-      .single()
-    
-    if (taskFetchError || !taskData) {
-      throw new Error('Failed to fetch task details for scheduling')
-    }
-    
-    const scheduledAtISO = taskData.scheduled_at
-    const sendRate = taskData.send_rate
-    
-    console.log('Scheduled at (UTC):', scheduledAtISO)
-    console.log('Send rate:', sendRate)
-    
-    // Get the current session to pass the access token
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    if (!session) {
-      throw new Error('No active session. Please log in again.')
-    }
-    
-    const response = await fetch('/api/schedule-emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        outbound_id: outboundId,
-        task_id: taskId,
-        scheduled_at: scheduledAtISO,
-        send_rate: sendRate
-      })
-    })
-
-    // Get the response text first to see what's coming back
-    const responseText = await response.text()
-    console.log('📨 Raw API response:', responseText)
-
-    let result
+  const scheduleEmailSending = async (outboundId, taskId) => {
     try {
-      result = JSON.parse(responseText)
-    } catch (parseError) {
-      console.error('❌ Failed to parse API response:', parseError)
-      throw new Error(`Invalid API response: ${responseText.substring(0, 100)}...`)
-    }
-
-    console.log('📊 Parsed API result:', result)
-
-    if (!response.ok) {
-      throw new Error(result.error || `HTTP ${response.status}: Failed to schedule emails`)
-    }
-
-    if (!result.success) {
-      // Build a detailed error message
-      let errorMessage = result.error || 'Scheduling failed without specific error'
+      console.log('🚀 Scheduling emails via serverless QStash...')
+      console.log('Outbound ID:', outboundId)
+      console.log('Task ID:', taskId)
       
-      // If there are specific errors, include them
-      if (result.errors && result.errors.length > 0) {
-        const errorDetails = result.errors.slice(0, 3).join('; ') // Show first 3 errors
-        errorMessage = `${errorMessage}. Details: ${errorDetails}`
-        if (result.errors.length > 3) {
-          errorMessage += ` (and ${result.errors.length - 3} more errors)`
-        }
+      // Get the scheduled_at from the task (it's already in ISO format/UTC)
+      const { data: taskData, error: taskFetchError } = await supabase
+        .from('tasks')
+        .select('scheduled_at, send_rate')
+        .eq('id', taskId)
+        .single()
+      
+      if (taskFetchError || !taskData) {
+        throw new Error('Failed to fetch task details for scheduling')
       }
       
-      throw new Error(errorMessage)
+      const scheduledAtISO = taskData.scheduled_at
+      const sendRate = taskData.send_rate
+      
+      console.log('Scheduled at (UTC):', scheduledAtISO)
+      console.log('Send rate:', sendRate)
+      
+      // Get the current session to pass the access token
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        throw new Error('No active session. Please log in again.')
+      }
+      
+      const response = await fetch('/api/schedule-emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          outbound_id: outboundId,
+          task_id: taskId,
+          scheduled_at: scheduledAtISO,
+          send_rate: sendRate
+        })
+      })
+
+      // Get the response text first to see what's coming back
+      const responseText = await response.text()
+      console.log('📨 Raw API response:', responseText)
+
+      let result
+      try {
+        result = JSON.parse(responseText)
+      } catch (parseError) {
+        console.error('❌ Failed to parse API response:', parseError)
+        throw new Error(`Invalid API response: ${responseText.substring(0, 100)}...`)
+      }
+
+      console.log('📊 Parsed API result:', result)
+
+      if (!response.ok) {
+        throw new Error(result.error || `HTTP ${response.status}: Failed to schedule emails`)
+      }
+
+      if (!result.success) {
+        // Build a detailed error message
+        let errorMessage = result.error || 'Scheduling failed without specific error'
+        
+        // If there are specific errors, include them
+        if (result.errors && result.errors.length > 0) {
+          const errorDetails = result.errors.slice(0, 3).join('; ') // Show first 3 errors
+          errorMessage = `${errorMessage}. Details: ${errorDetails}`
+          if (result.errors.length > 3) {
+            errorMessage += ` (and ${result.errors.length - 3} more errors)`
+          }
+        }
+        
+        throw new Error(errorMessage)
+      }
+
+      console.log('✅ Emails scheduled successfully:', result)
+      return result
+
+    } catch (error) {
+      console.error('❌ Error scheduling emails:', error)
+      
+      // More detailed error message
+      const detailedError = new Error(`Failed to schedule emails: ${error.message}`)
+      detailedError.originalError = error
+      throw detailedError
     }
-
-    console.log('✅ Emails scheduled successfully:', result)
-    return result
-
-  } catch (error) {
-    console.error('❌ Error scheduling emails:', error)
-    
-    // More detailed error message
-    const detailedError = new Error(`Failed to schedule emails: ${error.message}`)
-    detailedError.originalError = error
-    throw detailedError
   }
-}
 
   const resetForm = () => {
     setFormData({
@@ -337,7 +337,7 @@ const scheduleEmailSending = async (outboundId, taskId) => {
   if (!isOpen || !outbound) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b">
           <h3 className="text-lg font-semibold">Create Task for {outbound.name}</h3>
@@ -365,7 +365,7 @@ const scheduleEmailSending = async (outboundId, taskId) => {
                 <p className="font-medium">{outbound.name}</p>
               </div>
               <div>
-                <span className="text-blue-600">Available Accounts:</span>
+                <span className="text-blue-600">Active Email Accounts:</span>
                 <p className="font-medium">{emailAccounts.length}</p>
               </div>
             </div>
@@ -476,27 +476,6 @@ const scheduleEmailSending = async (outboundId, taskId) => {
               <p className="text-xs text-gray-500 mt-1">
                 Higher rates prevent spam flags
               </p>
-            </div>
-          </div>
-
-          {/* Email Accounts Preview */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email Accounts That Will Send
-            </label>
-            <div className="bg-gray-50 rounded-md p-3 max-h-32 overflow-y-auto">
-              {emailAccounts.length === 0 ? (
-                <p className="text-sm text-gray-500">No active email accounts found</p>
-              ) : (
-                <div className="space-y-1">
-                  {emailAccounts.map(account => (
-                    <div key={account.id} className="flex justify-between text-sm">
-                      <span className="text-gray-700">{account.sender_name}</span>
-                      <span className="text-gray-500 text-xs">{account.email}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
 
