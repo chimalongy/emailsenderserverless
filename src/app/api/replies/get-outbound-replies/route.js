@@ -233,7 +233,7 @@ export async function POST(req) {
 
         //console.log(payload);
         
-
+ 
       if (!emailaccount.access_token || !emailaccount.refresh_token) {
         console.log("Skipping emails for:", emailaccount.email, "- missing tokens");
         continue;
@@ -295,20 +295,20 @@ export async function POST(req) {
     // Filter out replies from deleted emails
     const deletedEmailList = (outbound.deleted_emails || '')
       .split('\n')
-      .map(email => email.trim())
+      .map(email => email.toLowerCase().trim())
       .filter(email => email.length > 0);
 
     const filteredReplies = replies.filter(reply => {
-      const fromEmail = extractEmail(reply.from || '');
+      let fromEmail = extractEmail(reply.from || '').toLowerCase();
       
       // For bounce emails, check the receiver field
-      if (reply.receiver && deletedEmailList.includes(reply.receiver)) {
+      if (reply.receiver && deletedEmailList.includes(reply.receiver.toLowerCase())) {
         return false;
       }
       
       // For regular replies, check if sender email is in deleted list
-      if (fromEmail && deletedEmailList.includes(fromEmail)) {
-        return false;
+      if (fromEmail && deletedEmailList.includes(fromEmail.toLowerCase())) {
+        return false; 
       }
       
       return true;

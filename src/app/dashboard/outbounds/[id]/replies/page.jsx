@@ -56,13 +56,13 @@ export default function OutboundRepliesPage() {
         const recipientEmail = extractEmailFromBounceBody(reply) || reply.receiver
         if (recipientEmail) {
           // Only show bounce if recipient email is NOT in deleted list
-          return !deletedEmailList.includes(recipientEmail)
+          return !deletedEmailList.includes(recipientEmail.toLowerCase())
         }
         // If we can't extract recipient email, show it (better to show than hide)
         return true
       } else {
         // For regular replies, check if sender email is in deleted list
-        return !deletedEmailList.includes(fromEmail)
+        return !deletedEmailList.includes(fromEmail.toLowerCase())
       }
     })
 
