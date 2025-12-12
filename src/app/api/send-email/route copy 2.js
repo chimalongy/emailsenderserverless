@@ -187,19 +187,12 @@ export async function POST(request) {
     }
 
     // Send email
-    let emailbody = email.body.replace(/\n/g, '<br>')
-    emailbody=emailbody+'<br><br>'
-    let email_signature = account.signature.replace(/\n/g, '<br>')
-
-    emailbody=emailbody+email_signature
-
-
     const mailOptions = {
       from: `"${account.sender_name}" <${account.email}>`,
       to: email.recipient,
       subject: email.subject || 'No Subject',
       text: email.body,
-      html: emailbody,
+      html: email.body.replace(/\n/g, '<br>'),
       headers,
     }
 
@@ -235,7 +228,7 @@ export async function POST(request) {
     console.error(`❌ Error sending email ${email_id || 'unknown'}:`, error)
 
     // Only try to update email status if we have a valid email_id
-    if (email_id) {
+    if (email_id && attempt >= 3) {
       try {
         await supabase
           .from('email_queue')

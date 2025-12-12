@@ -162,7 +162,7 @@ export async function POST(request) {
         // Only schedule if in the future
         if (scheduledTime > now) {
           // Schedule with QStash
-          await scheduleEmail(email.id, task_id, scheduledTime)
+          await scheduleEmail(email.id, task_id, scheduledTime,user.id)
 
           // Update email queue with scheduled time
           const { error: updateError } = await supabase

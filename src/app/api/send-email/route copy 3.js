@@ -235,7 +235,7 @@ export async function POST(request) {
     console.error(`❌ Error sending email ${email_id || 'unknown'}:`, error)
 
     // Only try to update email status if we have a valid email_id
-    if (email_id) {
+    if (email_id && attempt >= 3) {
       try {
         await supabase
           .from('email_queue')
