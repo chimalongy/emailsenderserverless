@@ -35,10 +35,10 @@ import { TbMail, TbMailOpened } from 'react-icons/tb'
 
 // Custom components
 const StepIndicator = ({ step, totalSteps, title, description, icon: Icon, currentStep }) => (
-  <div className={`flex items-start space-x-3 md:space-x-4 p-3 md:p-0 rounded-lg md:rounded-none ${currentStep === step ? 'bg-indigo-50 md:bg-transparent' : ''}`}>
+  <div className={`flex items-start space-x-3 md:space-x-4 p-3 md:p-0 rounded-lg md:rounded-none ${currentStep === step ? 'bg-gray-50 md:bg-transparent' : ''}`}>
     <div className={`flex-shrink-0 w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center ${
-      currentStep === step ? 'bg-indigo-600 text-white' : 
-      currentStep > step ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'
+      currentStep === step ? 'bg-teal-600 text-white' : 
+      currentStep > step ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-600'
     }`}>
       {currentStep > step ? <FiCheck className="h-4 w-4 md:h-5 md:w-5" /> : <Icon className="h-4 w-4 md:h-5 md:w-5" />}
     </div>
@@ -52,7 +52,7 @@ const StepIndicator = ({ step, totalSteps, title, description, icon: Icon, curre
   </div>
 )
 
-const StatBadge = ({ icon: Icon, label, value, color = 'blue', size = 'md', className = '' }) => {
+const StatBadge = ({ icon: Icon, label, value, color = 'gray', size = 'md', className = '' }) => {
   const sizeClasses = {
     sm: 'px-2 py-1 text-xs',
     md: 'px-3 py-1.5 text-xs md:text-sm',
@@ -60,11 +60,11 @@ const StatBadge = ({ icon: Icon, label, value, color = 'blue', size = 'md', clas
   }
 
   const colorClasses = {
-    blue: 'bg-blue-50 text-blue-700 border-blue-100',
-    green: 'bg-green-50 text-green-700 border-green-100',
-    orange: 'bg-orange-50 text-orange-700 border-orange-100',
+    gray: 'bg-gray-50 text-gray-700 border-gray-200',
+    green: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    orange: 'bg-amber-50 text-amber-700 border-amber-100',
     purple: 'bg-purple-50 text-purple-700 border-purple-100',
-    indigo: 'bg-indigo-50 text-indigo-700 border-indigo-100'
+    teal: 'bg-teal-50 text-teal-700 border-teal-100'
   }
 
   return (
@@ -90,9 +90,9 @@ const ProgressBar = ({ current, total, label }) => {
       <div className="h-1.5 md:h-2 bg-gray-200 rounded-full overflow-hidden">
         <div 
           className={`h-full rounded-full transition-all duration-500 ${
-            percentage === 100 ? 'bg-green-500' :
-            percentage >= 75 ? 'bg-blue-500' :
-            percentage >= 50 ? 'bg-yellow-500' :
+            percentage === 100 ? 'bg-emerald-500' :
+            percentage >= 75 ? 'bg-teal-500' :
+            percentage >= 50 ? 'bg-amber-500' :
             percentage >= 25 ? 'bg-orange-500' :
             'bg-red-500'
           }`}
@@ -106,7 +106,7 @@ const ProgressBar = ({ current, total, label }) => {
 const AccountCard = ({ account, selected, onSelect, onAllocationChange, maxAllocation }) => (
   <div className={`p-3 md:p-4 rounded-lg md:rounded-xl border transition-all duration-200 ${
     selected 
-      ? 'border-indigo-300 bg-indigo-50 shadow-sm' 
+      ? 'border-teal-300 bg-teal-50 shadow-sm' 
       : 'border-gray-200 bg-white hover:border-gray-300'
   }`}>
     <div className="flex items-start justify-between mb-2 md:mb-3">
@@ -115,7 +115,7 @@ const AccountCard = ({ account, selected, onSelect, onAllocationChange, maxAlloc
           type="checkbox"
           checked={selected}
           onChange={(e) => onSelect(e.target.checked)}
-          className="h-4 w-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 flex-shrink-0"
+          className="h-4 w-4 text-teal-600 rounded border-gray-300 focus:ring-teal-500 flex-shrink-0"
         />
         <div className="min-w-0 flex-1">
           <h4 className="font-medium text-gray-900 text-sm md:text-base truncate">{account.sender_name}</h4>
@@ -127,7 +127,7 @@ const AccountCard = ({ account, selected, onSelect, onAllocationChange, maxAlloc
         <div className="text-xs md:text-sm font-semibold whitespace-nowrap">
           <span className="text-gray-600">{account.sent_today || 0}</span>
           <span className="text-gray-400 mx-1">/</span>
-          <span className="text-indigo-600">{account.daily_limit}</span>
+          <span className="text-teal-600">{account.daily_limit}</span>
         </div>
       </div>
     </div>
@@ -135,7 +135,7 @@ const AccountCard = ({ account, selected, onSelect, onAllocationChange, maxAlloc
     <div className="space-y-2 md:space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-xs md:text-sm text-gray-600">Available</span>
-        <span className="text-xs md:text-sm font-semibold text-green-600 whitespace-nowrap">
+        <span className="text-xs md:text-sm font-semibold text-emerald-600 whitespace-nowrap">
           {account.available_capacity} emails
         </span>
       </div>
@@ -144,7 +144,7 @@ const AccountCard = ({ account, selected, onSelect, onAllocationChange, maxAlloc
         <div className="flex items-center justify-between text-xs md:text-sm">
           <span className="text-gray-600">Allocate</span>
           <span className="font-medium whitespace-nowrap">
-            <span className="text-indigo-600">{account.allocated_emails}</span>
+            <span className="text-teal-600">{account.allocated_emails}</span>
             <span className="text-gray-400 mx-1">/</span>
             <span className="text-gray-600">{account.available_capacity}</span>
           </span>
@@ -156,7 +156,7 @@ const AccountCard = ({ account, selected, onSelect, onAllocationChange, maxAlloc
             max={Math.min(account.available_capacity, maxAllocation)}
             value={account.allocated_emails}
             onChange={(e) => onAllocationChange(parseInt(e.target.value) || 0)}
-            className="flex-1 h-1.5 md:h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+            className="flex-1 h-1.5 md:h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-teal-600 [&::-webkit-slider-thumb]:cursor-pointer"
           />
           <input
             type="number"
@@ -164,7 +164,7 @@ const AccountCard = ({ account, selected, onSelect, onAllocationChange, maxAlloc
             max={Math.min(account.available_capacity, maxAllocation)}
             value={account.allocated_emails}
             onChange={(e) => onAllocationChange(parseInt(e.target.value) || 0)}
-            className="w-16 md:w-20 px-2 py-1.5 text-xs md:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            className="w-16 md:w-20 px-2 py-1.5 text-xs md:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
           />
         </div>
       </div>
@@ -172,11 +172,11 @@ const AccountCard = ({ account, selected, onSelect, onAllocationChange, maxAlloc
       {account.allocated_emails > 0 && (
         <div className="mt-1.5 md:mt-2 pt-1.5 md:pt-2 border-t border-gray-100">
           <div className="flex items-center text-xs">
-            <div className="flex-1 text-green-600 font-medium truncate">
+            <div className="flex-1 text-emerald-600 font-medium truncate">
               ✓ {account.allocated_emails} emails allocated
             </div>
             {account.allocated_emails === account.available_capacity && (
-              <span className="px-1.5 py-0.5 bg-green-100 text-green-800 text-xs font-medium rounded flex-shrink-0 ml-2">
+              <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-xs font-medium rounded flex-shrink-0 ml-2">
                 Full
               </span>
             )}
@@ -590,10 +590,10 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
         {/* Modal */}
         <div className="relative bg-white rounded-xl md:rounded-2xl shadow-2xl w-full max-w-full md:max-w-6xl max-h-[90vh] md:max-h-[90vh] overflow-hidden flex flex-col mx-auto">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-white">
+          <div className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200 bg-white">
             <div className="flex items-center space-x-2 md:space-x-4 flex-1 min-w-0">
-              <div className="p-2 md:p-3 bg-indigo-100 rounded-lg md:rounded-xl">
-                <HiOutlineLightningBolt className="h-5 w-5 md:h-7 md:w-7 text-indigo-600" />
+              <div className="p-2 md:p-3 bg-gray-100 rounded-lg md:rounded-xl">
+                <HiOutlineLightningBolt className="h-5 w-5 md:h-7 md:w-7 text-gray-700" />
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="text-lg md:text-2xl font-bold text-gray-900 truncate">Create New Campaign</h3>
@@ -625,7 +625,7 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
 
           {/* Content */}
           <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
-            {/* Left Sidebar - Stepper - Hidden on mobile unless toggled */}
+            {/* Left Sidebar - Stepper */}
             <div className={`${isMobile ? (showMobileStepper ? 'block' : 'hidden') : 'block'} md:block w-full md:w-72 border-b md:border-b-0 md:border-r border-gray-200 bg-gray-50 p-3 md:p-4 lg:p-6 overflow-y-auto`}>
               <div className="space-y-4 md:space-y-8">
                 <StepIndicator
@@ -686,7 +686,7 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
             {/* Main Content */}
             <div className="flex-1 overflow-y-auto p-3 md:p-4 lg:p-6">
               {validationError && (
-                <div className="mb-4 p-3 md:p-4 bg-red-50 border border-red-200 rounded-lg md:rounded-xl">
+                <div className="mb-4 p-3 md:p-4 bg-red-50 border-l-4 border-red-400 rounded-lg md:rounded-xl">
                   <div className="flex items-start">
                     <FiAlertCircle className="h-4 w-4 md:h-5 md:w-5 text-red-400 mt-0.5 mr-2 md:mr-3 flex-shrink-0" />
                     <div className="min-w-0 flex-1">
@@ -723,13 +723,13 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                   <div className="space-y-4 md:space-y-6">
                     <div>
                       <label className="block text-sm font-semibold text-gray-900 mb-1.5 md:mb-2">
-                        <FiPackage className="inline mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4 text-indigo-600" />
+                        <FiPackage className="inline mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4 text-gray-600" />
                         Campaign Name *
                       </label>
                       <input
                         type="text"
                         required
-                        className="w-full px-3 md:px-4 py-2.5 md:py-3 text-base md:text-lg border border-gray-300 rounded-lg md:rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                        className="w-full px-3 md:px-4 py-2.5 md:py-3 text-base md:text-lg border border-gray-300 rounded-lg md:rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
                         placeholder="Q4 Sales Outreach 2024"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -739,14 +739,14 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                     <div>
                       <div className="flex items-center justify-between mb-1.5 md:mb-2">
                         <label className="block text-sm font-semibold text-gray-900">
-                          <FiMail className="inline mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4 text-indigo-600" />
+                          <FiMail className="inline mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4 text-gray-600" />
                           Recipient Email List *
                         </label>
                         <span className="text-xs md:text-sm font-medium text-gray-600 whitespace-nowrap ml-2">
                           {getTotalEmails()} emails
                         </span>
                       </div>
-                      <div className="border border-gray-300 rounded-lg md:rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500">
+                      <div className="border border-gray-300 rounded-lg md:rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-teal-500 focus-within:border-teal-500">
                         <textarea
                           rows="6"
                           required
@@ -765,7 +765,7 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                     <div className="border border-gray-200 rounded-lg md:rounded-xl overflow-hidden">
                       <div className="bg-gray-50 px-3 md:px-4 py-2 md:py-3 border-b border-gray-200">
                         <h4 className="font-semibold text-gray-900 text-sm md:text-base flex items-center">
-                          <FiUsers className="mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+                          <FiUsers className="mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4 text-gray-600" />
                           Available Sending Accounts ({emailAccounts.length})
                         </h4>
                       </div>
@@ -792,7 +792,7 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                                   <div className="text-xs font-medium text-gray-600 whitespace-nowrap">
                                     {account.sent_today || 0}/{account.daily_limit}
                                   </div>
-                                  <div className="text-xs text-green-600 font-semibold whitespace-nowrap">
+                                  <div className="text-xs text-emerald-600 font-semibold whitespace-nowrap">
                                     {account.daily_limit} capacity
                                   </div>
                                 </div>
@@ -815,14 +815,14 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
               {step === 2 && (
                 <div className="space-y-4 md:space-y-6">
                   {/* Header Stats */}
-                  <div className="bg-gradient-to-r from-indigo-50 to-white rounded-lg md:rounded-xl p-3 md:p-4 lg:p-5">
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg md:rounded-xl p-3 md:p-4 lg:p-5">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 md:gap-4">
                       <div className="flex flex-wrap gap-2">
                         <StatBadge
                           icon={TbMail}
                           label="Total Emails"
                           value={getTotalEmails()}
-                          color="indigo"
+                          color="teal"
                           className="flex-1 sm:flex-none"
                         />
                         <StatBadge
@@ -841,7 +841,7 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                         />
                       </div>
                       {getTotalAllocated() === getTotalEmails() && (
-                        <div className="inline-flex items-center px-2 md:px-3 py-1 md:py-1.5 bg-green-100 text-green-800 text-xs md:text-sm font-medium rounded-full mt-2 sm:mt-0">
+                        <div className="inline-flex items-center px-2 md:px-3 py-1 md:py-1.5 bg-emerald-100 text-emerald-800 text-xs md:text-sm font-medium rounded-full mt-2 sm:mt-0">
                           <FiCheck className="mr-1 h-3 w-3 md:h-4 md:w-4" />
                           All emails allocated ✓
                         </div>
@@ -861,7 +861,7 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                     <div className="flex flex-col gap-3 md:gap-4">
                       <div className="flex-1">
                         <label className="block text-sm font-semibold text-gray-900 mb-1.5 md:mb-2">
-                          <FiDivide className="inline mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+                          <FiDivide className="inline mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4 text-gray-600" />
                           Bulk Allocation
                         </label>
                         <div className="flex flex-col sm:flex-row gap-2 md:gap-3">
@@ -869,14 +869,14 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                             type="number"
                             min="1"
                             placeholder="Enter number of emails"
-                            className="flex-1 px-3 md:px-4 py-2 md:py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                            className="flex-1 px-3 md:px-4 py-2 md:py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm"
                             value={bulkAllocation}
                             onChange={(e) => setBulkAllocation(e.target.value)}
                           />
                           <button
                             type="button"
                             onClick={handleBulkAllocation}
-                            className="px-3 md:px-5 py-2 md:py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-medium rounded-lg hover:from-indigo-700 hover:to-indigo-800 transition-all duration-200 text-sm whitespace-nowrap"
+                            className="px-3 md:px-5 py-2 md:py-2.5 bg-teal-600 text-white font-medium rounded-lg hover:bg-teal-700 transition-all duration-200 text-sm whitespace-nowrap"
                           >
                             Apply to Selected
                           </button>
@@ -907,7 +907,7 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                     {/* Quick Allocation */}
                     <div className="pt-3 md:pt-4 border-t border-gray-200">
                       <label className="block text-sm font-semibold text-gray-900 mb-2 md:mb-3">
-                        <HiOutlineChartBar className="inline mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+                        <HiOutlineChartBar className="inline mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4 text-gray-600" />
                         Quick Allocation Strategies
                       </label>
                       <div className="flex flex-wrap gap-1.5 md:gap-2">
@@ -922,7 +922,7 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                         <button
                           type="button"
                           onClick={() => applyQuickAllocation('capacity')}
-                          className="flex-1 min-w-[calc(50%-0.375rem)] sm:flex-none px-3 md:px-4 py-2 bg-green-50 text-green-700 text-xs md:text-sm font-medium rounded-lg hover:bg-green-100 transition-colors flex items-center justify-center"
+                          className="flex-1 min-w-[calc(50%-0.375rem)] sm:flex-none px-3 md:px-4 py-2 bg-emerald-50 text-emerald-700 text-xs md:text-sm font-medium rounded-lg hover:bg-emerald-100 transition-colors flex items-center justify-center"
                         >
                           <FiBarChart2 className="mr-1.5 h-3 w-3 md:h-4 md:w-4" />
                           By Capacity %
@@ -960,7 +960,7 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                       <input
                         type="text"
                         placeholder="Search accounts..."
-                        className="w-full pl-9 md:pl-10 pr-4 py-2 md:py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                        className="w-full pl-9 md:pl-10 pr-4 py-2 md:py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                       />
@@ -975,7 +975,7 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                           onClick={() => setViewMode('grid')}
                           className={`px-2 md:px-3 py-1 md:py-1.5 text-xs md:text-sm rounded-md transition-colors whitespace-nowrap ${
                             viewMode === 'grid' 
-                              ? 'bg-white text-indigo-600 shadow-sm' 
+                              ? 'bg-white text-teal-600 shadow-sm' 
                               : 'text-gray-600 hover:text-gray-900'
                           }`}
                         >
@@ -986,7 +986,7 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                           onClick={() => setViewMode('table')}
                           className={`px-2 md:px-3 py-1 md:py-1.5 text-xs md:text-sm rounded-md transition-colors whitespace-nowrap ${
                             viewMode === 'table' 
-                              ? 'bg-white text-indigo-600 shadow-sm' 
+                              ? 'bg-white text-teal-600 shadow-sm' 
                               : 'text-gray-600 hover:text-gray-900'
                           }`}
                         >
@@ -1019,7 +1019,7 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                               <th className="px-2 py-2 md:px-4 md:py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                 <input
                                   type="checkbox"
-                                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-3 w-3 md:h-4 md:w-4"
+                                  className="rounded border-gray-300 text-teal-600 focus:ring-teal-500 h-3 w-3 md:h-4 md:w-4"
                                   checked={formData.allocations.length > 0 && formData.allocations.every(acc => acc.selected)}
                                   onChange={(e) => handleSelectAll(e.target.checked)}
                                 />
@@ -1047,7 +1047,7 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                                 <td className="px-2 py-2 md:px-4 md:py-3">
                                   <input
                                     type="checkbox"
-                                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-3 w-3 md:h-4 md:w-4"
+                                    className="rounded border-gray-300 text-teal-600 focus:ring-teal-500 h-3 w-3 md:h-4 md:w-4"
                                     checked={account.selected || false}
                                     onChange={(e) => handleSelectAccount(account.account_id, e.target.checked)}
                                   />
@@ -1068,7 +1068,7 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                                   </div>
                                 </td>
                                 <td className="px-2 py-2 md:px-4 md:py-3">
-                                  <div className="font-medium text-green-600 text-xs md:text-sm">
+                                  <div className="font-medium text-emerald-600 text-xs md:text-sm">
                                     {account.available_capacity}
                                   </div>
                                 </td>
@@ -1078,7 +1078,7 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                                       type="number"
                                       min="0"
                                       max={Math.min(account.available_capacity, getTotalEmails() - getTotalAllocated() + account.allocated_emails)}
-                                      className="w-16 md:w-20 px-1.5 md:px-2 py-1 md:py-1.5 border border-gray-300 rounded text-xs md:text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                      className="w-16 md:w-20 px-1.5 md:px-2 py-1 md:py-1.5 border border-gray-300 rounded text-xs md:text-sm focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                                       value={account.allocated_emails}
                                       onChange={(e) => handleAllocationChange(account.account_id, e.target.value)}
                                     />
@@ -1093,7 +1093,7 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                                       Over capacity
                                     </span>
                                   ) : account.allocated_emails > 0 ? (
-                                    <span className="inline-flex items-center px-1.5 md:px-2.5 py-0.5 md:py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 whitespace-nowrap">
+                                    <span className="inline-flex items-center px-1.5 md:px-2.5 py-0.5 md:py-1 text-xs font-medium rounded-full bg-emerald-100 text-emerald-800 whitespace-nowrap">
                                       {account.allocated_emails} allocated
                                     </span>
                                   ) : (
@@ -1127,10 +1127,10 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
               {/* Step 3 Content */}
               {step === 3 && (
                 <div className="space-y-4 md:space-y-6">
-                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg md:rounded-2xl p-3 md:p-4 lg:p-6">
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg md:rounded-2xl p-3 md:p-4 lg:p-6">
                     <div className="flex items-start">
-                      <div className="p-2 md:p-3 bg-green-100 rounded-lg md:rounded-xl mr-2 md:mr-4">
-                        <FiCheck className="h-5 w-5 md:h-7 md:w-7 text-green-600" />
+                      <div className="p-2 md:p-3 bg-emerald-100 rounded-lg md:rounded-xl mr-2 md:mr-4">
+                        <FiCheck className="h-5 w-5 md:h-7 md:w-7 text-emerald-600" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="text-base md:text-xl font-bold text-gray-900">Campaign Ready to Launch! 🚀</h4>
@@ -1145,7 +1145,7 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                     {/* Campaign Summary */}
                     <div className="bg-white border border-gray-200 rounded-lg md:rounded-xl p-3 md:p-4 lg:p-5">
                       <h5 className="font-semibold text-gray-900 text-sm md:text-base mb-2 md:mb-4 flex items-center">
-                        <FiPackage className="mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+                        <FiPackage className="mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4 text-gray-600" />
                         Campaign Summary
                       </h5>
                       <div className="space-y-2 md:space-y-4">
@@ -1156,11 +1156,11 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                         <div className="grid grid-cols-2 gap-2 md:gap-4">
                           <div>
                             <label className="text-xs md:text-sm text-gray-600">Total Recipients</label>
-                            <p className="font-bold text-xl md:text-2xl text-indigo-600">{getTotalEmails()}</p>
+                            <p className="font-bold text-xl md:text-2xl text-teal-600">{getTotalEmails()}</p>
                           </div>
                           <div>
                             <label className="text-xs md:text-sm text-gray-600">Accounts Used</label>
-                            <p className="font-bold text-xl md:text-2xl text-green-600">
+                            <p className="font-bold text-xl md:text-2xl text-emerald-600">
                               {formData.allocations.filter(a => a.allocated_emails > 0).length}
                             </p>
                           </div>
@@ -1171,13 +1171,13 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                     {/* Allocation Summary */}
                     <div className="bg-white border border-gray-200 rounded-lg md:rounded-xl p-3 md:p-4 lg:p-5">
                       <h5 className="font-semibold text-gray-900 text-sm md:text-base mb-2 md:mb-4 flex items-center">
-                        <FiTarget className="mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+                        <FiTarget className="mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4 text-gray-600" />
                         Allocation Summary
                       </h5>
                       <div className="space-y-2 md:space-y-3">
                         <div className="flex justify-between items-center">
                           <span className="text-xs md:text-sm text-gray-600">Total Allocated</span>
-                          <span className="font-bold text-green-600 text-sm md:text-base">{getTotalAllocated()} emails</span>
+                          <span className="font-bold text-emerald-600 text-sm md:text-base">{getTotalAllocated()} emails</span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-xs md:text-sm text-gray-600">Distribution Method</span>
@@ -1198,7 +1198,7 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                   <div className="bg-white border border-gray-200 rounded-lg md:rounded-xl overflow-hidden">
                     <div className="bg-gray-50 px-3 md:px-4 lg:px-5 py-2 md:py-3 border-b border-gray-200">
                       <h5 className="font-semibold text-gray-900 text-sm md:text-base flex items-center">
-                        <FiUsers className="mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+                        <FiUsers className="mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4 text-gray-600" />
                         Account Allocations ({formData.allocations.filter(a => a.allocated_emails > 0).length})
                       </h5>
                     </div>
@@ -1209,8 +1209,8 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                           <div key={allocation.account_id} className="p-2 md:p-3 lg:p-4 hover:bg-gray-50">
                             <div className="flex justify-between items-center">
                               <div className="flex items-center space-x-2 md:space-x-3 min-w-0 flex-1">
-                                <div className="p-1.5 md:p-2 bg-indigo-50 rounded-lg flex-shrink-0">
-                                  <TbMail className="h-3 w-3 md:h-4 md:w-4 lg:h-5 lg:w-5 text-indigo-600" />
+                                <div className="p-1.5 md:p-2 bg-teal-50 rounded-lg flex-shrink-0">
+                                  <TbMail className="h-3 w-3 md:h-4 md:w-4 lg:h-5 lg:w-5 text-teal-600" />
                                 </div>
                                 <div className="min-w-0 flex-1">
                                   <p className="font-medium text-gray-900 text-xs md:text-sm truncate">{allocation.sender_name}</p>
@@ -1218,7 +1218,7 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                                 </div>
                               </div>
                               <div className="text-right ml-2 flex-shrink-0">
-                                <p className="text-sm md:text-base lg:text-lg font-bold text-indigo-600 whitespace-nowrap">
+                                <p className="text-sm md:text-base lg:text-lg font-bold text-teal-600 whitespace-nowrap">
                                   {allocation.allocated_emails} emails
                                 </p>
                                 <p className="text-xs text-gray-500 whitespace-nowrap">
@@ -1254,7 +1254,7 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                   type="button"
                   onClick={handleNextStep}
                   disabled={loading || (step === 2 && getTotalAllocated() !== getTotalEmails())}
-                  className="flex items-center px-4 md:px-5 lg:px-6 py-1.5 md:py-2 lg:py-3 text-white bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-lg hover:from-indigo-700 hover:to-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 text-sm"
+                  className="flex items-center px-4 md:px-5 lg:px-6 py-1.5 md:py-2 lg:py-3 text-white bg-teal-600 rounded-lg hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 text-sm"
                 >
                   {loading ? (
                     <>

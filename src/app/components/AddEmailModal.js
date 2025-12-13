@@ -18,6 +18,7 @@ import {
   FiShield
 } from 'react-icons/fi'
 import { HiOutlineDocumentText, HiOutlineExclamationCircle } from 'react-icons/hi'
+import { RiLoader4Line } from 'react-icons/ri'
 
 export default function AddEmailModal({ isOpen, onClose, onSuccess, editingEmail }) {
   const { user } = useAuth()
@@ -206,13 +207,13 @@ export default function AddEmailModal({ isOpen, onClose, onSuccess, editingEmail
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-white">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-teal-50 to-cyan-50">
           <div className="flex items-center space-x-3">
-            <div className="p-2 bg-indigo-100 rounded-lg">
+            <div className="p-2 bg-gradient-to-br from-teal-100 to-cyan-100 rounded-lg">
               {editingEmail ? (
-                <FiEdit3 className="h-6 w-6 text-indigo-600" />
+                <FiEdit3 className="h-6 w-6 text-teal-600" />
               ) : (
-                <FiMail className="h-6 w-6 text-indigo-600" />
+                <FiMail className="h-6 w-6 text-teal-600" />
               )}
             </div>
             <div>
@@ -228,9 +229,9 @@ export default function AddEmailModal({ isOpen, onClose, onSuccess, editingEmail
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            <FiX className="h-5 w-5 text-gray-500" />
+            <FiX className="h-5 w-5" />
           </button>
         </div>
 
@@ -240,7 +241,7 @@ export default function AddEmailModal({ isOpen, onClose, onSuccess, editingEmail
             {/* Sender Name */}
             <div>
               <label className="flex items-center text-sm font-semibold text-gray-900 mb-2">
-                <FiUser className="mr-2 h-4 w-4 text-indigo-600" />
+                <FiUser className="mr-2 h-4 w-4 text-teal-600" />
                 Sender Name
               </label>
               <input
@@ -249,7 +250,7 @@ export default function AddEmailModal({ isOpen, onClose, onSuccess, editingEmail
                 className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
                   errors.sender_name 
                     ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
-                    : 'border-gray-300 focus:ring-indigo-500 focus:border-indigo-500'
+                    : 'border-gray-300 focus:ring-teal-500 focus:border-teal-500'
                 }`}
                 value={formData.sender_name}
                 onChange={(e) => setFormData({ ...formData, sender_name: e.target.value })}
@@ -266,7 +267,7 @@ export default function AddEmailModal({ isOpen, onClose, onSuccess, editingEmail
             {/* Email Address */}
             <div>
               <label className="flex items-center text-sm font-semibold text-gray-900 mb-2">
-                <FiMail className="mr-2 h-4 w-4 text-indigo-600" />
+                <FiMail className="mr-2 h-4 w-4 text-teal-600" />
                 Email Address
               </label>
               <input
@@ -276,7 +277,7 @@ export default function AddEmailModal({ isOpen, onClose, onSuccess, editingEmail
                 className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-colors disabled:bg-gray-100 ${
                   errors.email 
                     ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
-                    : 'border-gray-300 focus:ring-indigo-500 focus:border-indigo-500'
+                    : 'border-gray-300 focus:ring-teal-500 focus:border-teal-500'
                 }`}
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -300,14 +301,14 @@ export default function AddEmailModal({ isOpen, onClose, onSuccess, editingEmail
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="flex items-center text-sm font-semibold text-gray-900">
-                  <FiKey className="mr-2 h-4 w-4 text-indigo-600" />
+                  <FiKey className="mr-2 h-4 w-4 text-teal-600" />
                   App Password
                 </label>
                 <div className="flex items-center space-x-2">
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="text-xs text-indigo-600 hover:text-indigo-700 flex items-center"
+                    className="text-xs text-teal-600 hover:text-teal-700 flex items-center"
                   >
                     {showPassword ? (
                       <>
@@ -339,7 +340,7 @@ export default function AddEmailModal({ isOpen, onClose, onSuccess, editingEmail
                   className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition-colors pr-12 ${
                     errors.app_password 
                       ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
-                      : 'border-gray-300 focus:ring-indigo-500 focus:border-indigo-500'
+                      : 'border-gray-300 focus:ring-teal-500 focus:border-teal-500'
                   }`}
                   value={formData.app_password}
                   onChange={(e) => setFormData({ ...formData, app_password: e.target.value })}
@@ -374,7 +375,7 @@ export default function AddEmailModal({ isOpen, onClose, onSuccess, editingEmail
             {/* Daily Limit */}
             <div>
               <label className="flex items-center text-sm font-semibold text-gray-900 mb-2">
-                <FiBarChart2 className="mr-2 h-4 w-4 text-indigo-600" />
+                <FiBarChart2 className="mr-2 h-4 w-4 text-teal-600" />
                 Daily Sending Limit
               </label>
               <div className="flex items-center space-x-4">
@@ -383,7 +384,7 @@ export default function AddEmailModal({ isOpen, onClose, onSuccess, editingEmail
                   min="1"
                   max="500"
                   step="1"
-                  className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  className="flex-1 h-2 bg-gradient-to-r from-teal-200 to-teal-400 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-teal-600 [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-teal-600 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
                   value={formData.daily_limit}
                   onChange={(e) => setFormData({ ...formData, daily_limit: parseInt(e.target.value) })}
                 />
@@ -396,7 +397,7 @@ export default function AddEmailModal({ isOpen, onClose, onSuccess, editingEmail
                     className={`w-full px-3 py-2 border rounded-lg text-center font-semibold ${
                       errors.daily_limit 
                         ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
-                        : 'border-gray-300 focus:ring-indigo-500 focus:border-indigo-500'
+                        : 'border-gray-300 focus:ring-teal-500 focus:border-teal-500'
                     }`}
                     value={formData.daily_limit}
                     onChange={handleNumberChange}
@@ -417,12 +418,12 @@ export default function AddEmailModal({ isOpen, onClose, onSuccess, editingEmail
             {/* Signature */}
             <div>
               <label className="flex items-center text-sm font-semibold text-gray-900 mb-2">
-                <HiOutlineDocumentText className="mr-2 h-4 w-4 text-indigo-600" />
+                <HiOutlineDocumentText className="mr-2 h-4 w-4 text-teal-600" />
                 Email Signature
               </label>
               <textarea
                 rows="4"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors resize-none"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors resize-none"
                 value={formData.signature}
                 onChange={(e) => setFormData({ ...formData, signature: e.target.value })}
                 placeholder="Best regards,&#10;John Doe&#10;CEO at Example Corp"
@@ -434,7 +435,7 @@ export default function AddEmailModal({ isOpen, onClose, onSuccess, editingEmail
 
             {/* Form-level error */}
             {errors.submit && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="p-4 bg-red-50 border-l-4 border-red-400 rounded-lg">
                 <p className="flex items-center text-sm text-red-600">
                   <HiOutlineExclamationCircle className="mr-2 h-4 w-4" />
                   {errors.submit}
@@ -450,12 +451,12 @@ export default function AddEmailModal({ isOpen, onClose, onSuccess, editingEmail
             <div className="text-sm text-gray-600">
               {testingEmail ? (
                 <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600 mr-2"></div>
+                  <RiLoader4Line className="animate-spin h-4 w-4 text-teal-600 mr-2" />
                   Sending test email to verify credentials...
                 </div>
               ) : (
                 <div className="flex items-center">
-                  <FiCheck className="mr-2 h-4 w-4 text-green-500" />
+                  <FiCheck className="mr-2 h-4 w-4 text-emerald-500" />
                   {editingEmail ? 'Your changes will be saved immediately' : 'Account will be verified before saving'}
                 </div>
               )}
@@ -472,7 +473,7 @@ export default function AddEmailModal({ isOpen, onClose, onSuccess, editingEmail
                 type="submit"
                 onClick={handleSubmit}
                 disabled={loading || testingEmail}
-                className="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-lg hover:from-indigo-700 hover:to-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center"
+                className="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-teal-600 to-cyan-600 rounded-lg hover:from-teal-700 hover:to-cyan-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center shadow-sm hover:shadow"
               >
                 {loading ? (
                   <>

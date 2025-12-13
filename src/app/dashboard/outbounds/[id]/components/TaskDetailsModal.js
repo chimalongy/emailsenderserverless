@@ -340,7 +340,7 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
         <div className="flex-1 overflow-y-auto">
           <div className="p-4 space-y-4">
             {/* Task Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="p-1.5 bg-teal-100 rounded">

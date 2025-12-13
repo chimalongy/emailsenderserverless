@@ -7,7 +7,8 @@ import { useAuth } from '../../../../components/AuthProvider'
 import {
     RiArrowLeftLine, RiMailLine, RiUserLine, RiFileCopyLine, RiDeleteBinLine,
     RiSearchLine, RiCheckboxBlankLine, RiCheckboxFill, RiArrowDownSLine, RiArrowRightSLine,
-    RiErrorWarningLine, RiLoader4Line, RiRestartLine, RiDeleteBin7Line
+    RiErrorWarningLine, RiLoader4Line, RiRestartLine, RiDeleteBin7Line,
+    RiExternalLinkLine, RiEyeLine, RiEyeOffLine, RiFilterLine, RiRefreshLine
 } from 'react-icons/ri'
 import toast from 'react-hot-toast'
 
@@ -33,6 +34,8 @@ export default function EmailListPage() {
     const [emailToDelete, setEmailToDelete] = useState(null)
     const [showPermanentDeleteConfirm, setShowPermanentDeleteConfirm] = useState(false)
     const [emailToPermanentDelete, setEmailToPermanentDelete] = useState(null)
+    const [showEmailPreview, setShowEmailPreview] = useState(false)
+    const [previewEmail, setPreviewEmail] = useState('')
 
     useEffect(() => {
         if (!user || !outboundId) return
@@ -79,7 +82,7 @@ export default function EmailListPage() {
             
             // Create account lookup map
             const accountMap = new Map()
-            accountsData.forEach(acc => {
+            accountsData?.forEach(acc => {
                 accountMap.set(acc.id, { name: acc.sender_name, email: acc.email })
             })
 
@@ -162,6 +165,11 @@ export default function EmailListPage() {
             console.error('Failed to copy email:', err)
             toast.error('Failed to copy email')
         }
+    }
+
+    const previewFullEmail = (email) => {
+        setPreviewEmail(email)
+        setShowEmailPreview(true)
     }
 
     const toggleEmailSelection = (email) => {
@@ -394,8 +402,8 @@ export default function EmailListPage() {
 
     if (loading) {
         return (
-            <div className="flex flex-col items-center justify-center h-64">
-                <RiLoader4Line className="animate-spin h-12 w-12 text-indigo-500 mb-4" />
+            <div className="flex flex-col items-center justify-center min-h-96">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mb-4"></div>
                 <p className="text-gray-600">Loading recipient lists...</p>
             </div>
         )
@@ -406,123 +414,190 @@ export default function EmailListPage() {
             <div className="space-y-4 p-6">
                 <button
                     onClick={() => router.push(`/dashboard/outbounds/${outboundId}`)}
-                    className="flex items-center text-indigo-600 hover:text-indigo-500 text-sm mb-4"
+                    className="flex items-center text-teal-600 hover:text-teal-500 text-sm font-medium group"
                 >
-                    <RiArrowLeftLine className="mr-1" /> Back to Outbound
+                    <RiArrowLeftLine className="mr-2 transition-transform group-hover:-translate-x-1" />
+                    Back to Campaign
                 </button>
-                <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded flex items-center">
-                    <RiErrorWarningLine className="mr-2" />
-                    {error}
+                <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-lg">
+                    <div className="flex">
+                        <RiErrorWarningLine className="h-5 w-5 text-red-400 mr-3 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                            <p className="text-red-800 font-medium truncate">Error loading email list</p>
+                            <p className="text-red-700 mt-1 break-words text-sm">{error}</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         )
     }
 
     return (
-        <div className="pb-8">
+        <div className="space-y-6 max-w-7xl mx-auto px-4 py-2">
             {/* Header */}
-            <div className="flex flex-col gap-4 mb-6 sm:mb-8">
-                <div>
-                    <button
-                        onClick={() => router.push(`/dashboard/outbounds/${outboundId}`)}
-                        className="flex items-center text-indigo-600 hover:text-indigo-800 mb-2 text-sm sm:text-base"
-                    >
-                        <RiArrowLeftLine className="mr-1" /> Back to Outbound
-                    </button>
-                    <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">
-                        Email List: {outbound?.name}
-                    </h1>
-                    <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                        Manage recipient emails and their allocations
-                    </p>
+            <div className="space-y-4">
+                <button
+                    onClick={() => router.push(`/dashboard/outbounds/${outboundId}`)}
+                    className="flex items-center text-teal-600 hover:text-teal-500 text-sm font-medium group"
+                >
+                    <RiArrowLeftLine className="mr-2 transition-transform group-hover:-translate-x-1" />
+                    Back to Campaign
+                </button>
+                
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900">Recipient Management</h1>
+                        <p className="text-gray-500 mt-1">
+                            Manage {totalActiveEmails} recipients for "{outbound?.name}"
+                        </p>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={fetchData}
+                            className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                            <RiRefreshLine className="h-4 w-4 mr-2" />
+                            Refresh
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="bg-white rounded-xl border border-gray-200 p-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-teal-50 rounded-lg">
+                            <RiMailLine className="h-5 w-5 text-teal-600" />
+                        </div>
+                        <div>
+                            <p className="text-2xl font-bold text-gray-900">{totalActiveEmails}</p>
+                            <p className="text-sm text-gray-500">Active Recipients</p>
+                        </div>
+                    </div>
+                </div>
+                
+                {/* <div className="bg-white rounded-xl border border-gray-200 p-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-emerald-50 rounded-lg">
+                            <RiUserLine className="h-5 w-5 text-emerald-600" />
+                        </div>
+                        <div>
+                            <p className="text-2xl font-bold text-gray-900">{emailAccounts.length}</p>
+                            <p className="text-sm text-gray-500">Sending Accounts</p>
+                        </div>
+                    </div>
+                </div>
+                 */}
+                <div className="bg-white rounded-xl border border-gray-200 p-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-amber-50 rounded-lg">
+                            <RiDeleteBinLine className="h-5 w-5 text-amber-600" />
+                        </div>
+                        <div>
+                            <p className="text-2xl font-bold text-gray-900">{deletedEmails.length}</p>
+                            <p className="text-sm text-gray-500">Deleted Recipients</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             {/* Tabs */}
-            <div className="flex border-b border-gray-200 mb-6">
+            <div className="flex border-b border-gray-200">
                 <button
                     onClick={() => setActiveTab('active')}
-                    className={`px-4 py-3 text-sm font-medium border-b-2 ${
+                    className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                         activeTab === 'active'
-                            ? 'border-indigo-500 text-indigo-600'
+                            ? 'border-teal-500 text-teal-600'
                             : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                 >
-                    Active Emails ({totalActiveEmails})
+                    <div className="flex items-center gap-2">
+                        <RiMailLine className="h-4 w-4" />
+                        Active ({totalActiveEmails})
+                    </div>
                 </button>
                 <button
                     onClick={() => setActiveTab('deleted')}
-                    className={`px-4 py-3 text-sm font-medium border-b-2 ${
+                    className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                         activeTab === 'deleted'
-                            ? 'border-indigo-500 text-indigo-600'
+                            ? 'border-teal-500 text-teal-600'
                             : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                 >
-                    Deleted Emails ({deletedEmails.length})
+                    <div className="flex items-center gap-2">
+                        <RiDeleteBinLine className="h-4 w-4" />
+                        Deleted ({deletedEmails.length})
+                    </div>
                 </button>
             </div>
 
             {/* Search and Bulk Actions */}
-            <div className="flex flex-col gap-4 mb-6">
-                <div className="relative w-full">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <RiSearchLine className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex-1">
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <RiSearchLine className="h-5 w-5 text-gray-400" />
+                            </div>
+                            <input
+                                type="text"
+                                placeholder={activeTab === 'active' 
+                                    ? "Search recipients or sending accounts..." 
+                                    : "Search deleted emails..."}
+                                className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
                     </div>
-                    <input
-                        type="text"
-                        placeholder={activeTab === 'active' 
-                            ? "Search recipients or sending emails..." 
-                            : "Search deleted emails..."}
-                        className="block w-full pl-8 sm:pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
 
-                {activeTab === 'active' && selectedEmails.length > 0 && (
-                    <div className="flex flex-col xs:flex-row xs:items-center gap-3">
-                        <span className="text-xs sm:text-sm text-gray-700">
-                            {selectedEmails.length} selected
-                        </span>
-                        <button
-                            onClick={handleBulkDelete}
-                            disabled={saving}
-                            className="inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-xs sm:text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed"
-                        >
-                            {saving ? (
-                                <RiLoader4Line className="animate-spin mr-1" />
-                            ) : (
-                                <RiDeleteBinLine className="mr-1" />
-                            )}
-                            Delete Selected
-                        </button>
-                    </div>
-                )}
+                    {activeTab === 'active' && selectedEmails.length > 0 && (
+                        <div className="flex items-center gap-3">
+                            <span className="text-sm text-gray-700 font-medium">
+                                {selectedEmails.length} selected
+                            </span>
+                            <button
+                                onClick={handleBulkDelete}
+                                disabled={saving}
+                                className="inline-flex items-center px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-all duration-200 active:scale-95 shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {saving ? (
+                                    <RiLoader4Line className="animate-spin h-4 w-4 mr-2" />
+                                ) : (
+                                    <RiDeleteBinLine className="h-4 w-4 mr-2" />
+                                )}
+                                Delete Selected
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Active Emails Tab */}
             {activeTab === 'active' && (
-                <div className="space-y-4 sm:space-y-6">
+                <div className="space-y-4">
                     {filteredEmailList.length === 0 ? (
-                        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 sm:p-6">
-                            <div className="text-center py-8 sm:py-12">
-                                <RiMailLine className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400" />
-                                <h3 className="mt-2 sm:mt-3 text-sm font-medium text-gray-900">
-                                    {searchTerm ? 'No matching recipients found' : 'No recipients found'}
-                                </h3>
-                                <p className="mt-1 text-xs sm:text-sm text-gray-500">
-                                    {searchTerm
-                                        ? 'Try a different search term'
-                                        : 'This outbound doesn\'t have any recipients assigned yet.'}
-                                </p>
+                        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+                            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-full flex items-center justify-center border border-teal-100 mb-4">
+                                <RiMailLine className="h-7 w-7 text-teal-500" />
                             </div>
+                            <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                {searchTerm ? 'No matching recipients found' : 'No recipients found'}
+                            </h3>
+                            <p className="text-sm text-gray-500">
+                                {searchTerm
+                                    ? 'Try a different search term'
+                                    : 'This campaign doesn\'t have any recipients assigned yet.'}
+                            </p>
                         </div>
                     ) : (
                         filteredEmailList.map((group, groupIndex) => (
-                            <div key={groupIndex} className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+                            <div key={groupIndex} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                                 {/* Group Header */}
                                 <div
-                                    className="bg-gray-50 px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex items-center justify-between cursor-pointer hover:bg-gray-100"
+                                    className="bg-gray-50 px-5 py-4 border-b border-gray-200 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors"
                                     onClick={() => toggleGroupCollapse(group.emailAssigned)}
                                 >
                                     <div className="flex items-center min-w-0">
@@ -531,33 +606,35 @@ export default function EmailListPage() {
                                                 e.stopPropagation()
                                                 toggleGroupSelection(group.emailAssigned)
                                             }}
-                                            className="mr-2 sm:mr-3 text-gray-400 hover:text-indigo-600 shrink-0"
+                                            className="mr-3 text-gray-400 hover:text-teal-600 transition-colors"
                                             aria-label={group.list.every(email => selectedEmails.includes(email)) ? "Deselect all" : "Select all"}
                                         >
                                             {group.list.every(email => selectedEmails.includes(email)) ? (
-                                                <RiCheckboxFill className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-600" />
+                                                <RiCheckboxFill className="h-5 w-5 text-teal-600" />
                                             ) : (
-                                                <RiCheckboxBlankLine className="h-4 w-4 sm:h-5 sm:w-5" />
+                                                <RiCheckboxBlankLine className="h-5 w-5" />
                                             )}
                                         </button>
                                         <div className="flex items-center min-w-0">
                                             {collapsedGroups[group.emailAssigned] ? (
-                                                <RiArrowRightSLine className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500 mr-2 shrink-0" />
+                                                <RiArrowRightSLine className="h-4 w-4 text-gray-500 mr-3" />
                                             ) : (
-                                                <RiArrowDownSLine className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500 mr-2 shrink-0" />
+                                                <RiArrowDownSLine className="h-4 w-4 text-gray-500 mr-3" />
                                             )}
-                                            <RiMailLine className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-500 mr-2 shrink-0" />
-                                            <div className="min-w-0">
-                                                <h2 className="font-medium text-gray-900 text-sm sm:text-base truncate">
+                                            <div className="p-2 bg-teal-50 rounded-lg">
+                                                <RiMailLine className="h-4 w-4 text-teal-600" />
+                                            </div>
+                                            <div className="ml-3 min-w-0">
+                                                <h2 className="font-medium text-gray-900 truncate">
                                                     {group.accountName}
                                                 </h2>
-                                                <p className="text-xs text-gray-500 truncate">{group.emailAssigned}</p>
+                                                <p className="text-sm text-gray-500 truncate">{group.emailAssigned}</p>
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center ml-2">
-                                        <span className="inline-flex items-center px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 whitespace-nowrap">
-                                            {group.list.length} {window.innerWidth < 640 ? '' : 'recipients'}
+                                    <div className="flex items-center gap-3">
+                                        <span className="px-3 py-1 text-xs font-medium bg-teal-100 text-teal-800 rounded-full whitespace-nowrap">
+                                            {group.list.length} recipients
                                         </span>
                                     </div>
                                 </div>
@@ -566,47 +643,57 @@ export default function EmailListPage() {
                                 {!collapsedGroups[group.emailAssigned] && (
                                     <div className="divide-y divide-gray-200">
                                         {group.list.map((email, emailIndex) => (
-                                            <div key={emailIndex} className="px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between hover:bg-gray-50">
+                                            <div key={emailIndex} className="px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
                                                 <div className="flex items-center min-w-0">
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation()
                                                             toggleEmailSelection(email)
                                                         }}
-                                                        className="mr-2 sm:mr-3 text-gray-400 hover:text-indigo-600 shrink-0"
+                                                        className="mr-3 text-gray-400 hover:text-teal-600 transition-colors"
                                                         aria-label={selectedEmails.includes(email) ? "Deselect email" : "Select email"}
                                                     >
                                                         {selectedEmails.includes(email) ? (
-                                                            <RiCheckboxFill className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-600" />
+                                                            <RiCheckboxFill className="h-5 w-5 text-teal-600" />
                                                         ) : (
-                                                            <RiCheckboxBlankLine className="h-4 w-4 sm:h-5 sm:w-5" />
+                                                            <RiCheckboxBlankLine className="h-5 w-5" />
                                                         )}
                                                     </button>
-                                                    <RiUserLine className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 mr-2 sm:mr-3 shrink-0" />
-                                                    <span className="text-gray-700 text-sm sm:text-base truncate">{email}</span>
+                                                    <RiUserLine className="h-4 w-4 text-gray-400 mr-3 flex-shrink-0" />
+                                                    <span 
+                                                        className="text-gray-700 truncate cursor-pointer hover:text-teal-600 transition-colors"
+                                                        onClick={() => previewFullEmail(email)}
+                                                    >
+                                                        {email}
+                                                    </span>
                                                 </div>
-                                                <div className="flex items-center gap-1 sm:gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => previewFullEmail(email)}
+                                                        className="p-2 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                                                        title="View full email"
+                                                    >
+                                                        <RiEyeLine className="h-4 w-4" />
+                                                    </button>
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation()
                                                             copyToClipboard(email)
                                                         }}
-                                                        className="text-gray-400 hover:text-indigo-600 p-1 rounded-md"
+                                                        className="p-2 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
                                                         title="Copy email"
-                                                        aria-label="Copy email"
                                                     >
-                                                        <RiFileCopyLine className="h-3 w-3 sm:h-4 sm:w-4" />
+                                                        <RiFileCopyLine className="h-4 w-4" />
                                                     </button>
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation()
                                                             handleDeleteEmail(email)
                                                         }}
-                                                        className="text-gray-400 hover:text-red-600 p-1 rounded-md"
+                                                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                                         title="Delete email"
-                                                        aria-label="Delete email"
                                                     >
-                                                        <RiDeleteBinLine className="h-3 w-3 sm:h-4 sm:w-4" />
+                                                        <RiDeleteBinLine className="h-4 w-4" />
                                                     </button>
                                                 </div>
                                             </div>
@@ -621,48 +708,48 @@ export default function EmailListPage() {
 
             {/* Deleted Emails Tab */}
             {activeTab === 'deleted' && (
-                <div className="space-y-4 sm:space-y-6">
+                <div className="space-y-4">
                     {filteredDeletedEmails.length === 0 ? (
-                        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 sm:p-6">
-                            <div className="text-center py-8 sm:py-12">
-                                <RiDeleteBinLine className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400" />
-                                <h3 className="mt-2 sm:mt-3 text-sm font-medium text-gray-900">
-                                    {searchTerm ? 'No matching deleted emails found' : 'No deleted emails'}
-                                </h3>
-                                <p className="mt-1 text-xs sm:text-sm text-gray-500">
-                                    {searchTerm
-                                        ? 'Try a different search term'
-                                        : 'No emails have been deleted from this outbound.'}
-                                </p>
+                        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+                            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-gray-50 to-gray-100 rounded-full flex items-center justify-center border border-gray-200 mb-4">
+                                <RiDeleteBinLine className="h-7 w-7 text-gray-500" />
                             </div>
+                            <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                {searchTerm ? 'No matching deleted emails found' : 'No deleted emails'}
+                            </h3>
+                            <p className="text-sm text-gray-500">
+                                {searchTerm
+                                    ? 'Try a different search term'
+                                    : 'No emails have been deleted from this campaign.'}
+                            </p>
                         </div>
                     ) : (
-                        <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+                        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                             <div className="divide-y divide-gray-200">
                                 {filteredDeletedEmails.map((email, index) => (
-                                    <div key={index} className="px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between hover:bg-gray-50">
+                                    <div key={index} className="px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
                                         <div className="flex items-center min-w-0">
-                                            <RiUserLine className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 mr-2 sm:mr-3 shrink-0" />
-                                            <span className="text-gray-500 text-sm sm:text-base truncate line-through">{email}</span>
+                                            <RiUserLine className="h-4 w-4 text-gray-400 mr-3 flex-shrink-0" />
+                                            <span className="text-gray-500 truncate line-through">
+                                                {email}
+                                            </span>
                                         </div>
-                                        <div className="flex items-center gap-1 sm:gap-2">
+                                        <div className="flex items-center gap-2">
                                             <button
                                                 onClick={() => handleRestoreEmail(email)}
                                                 disabled={saving}
-                                                className="text-gray-400 hover:text-green-600 p-1 rounded-md"
+                                                className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors disabled:opacity-50"
                                                 title="Restore email"
-                                                aria-label="Restore email"
                                             >
-                                                <RiRestartLine className="h-3 w-3 sm:h-4 sm:w-4" />
+                                                <RiRestartLine className="h-4 w-4" />
                                             </button>
                                             <button
                                                 onClick={() => handlePermanentDelete(email)}
                                                 disabled={saving}
-                                                className="text-gray-400 hover:text-red-600 p-1 rounded-md"
+                                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
                                                 title="Permanently delete"
-                                                aria-label="Permanently delete"
                                             >
-                                                <RiDeleteBin7Line className="h-3 w-3 sm:h-4 sm:w-4" />
+                                                <RiDeleteBin7Line className="h-4 w-4" />
                                             </button>
                                         </div>
                                     </div>
@@ -673,33 +760,71 @@ export default function EmailListPage() {
                 </div>
             )}
 
+            {/* Email Preview Modal */}
+            {showEmailPreview && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl max-w-lg w-full">
+                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                            <h3 className="text-lg font-medium text-gray-900">Email Address</h3>
+                            <button
+                                onClick={() => setShowEmailPreview(false)}
+                                className="text-gray-400 hover:text-gray-600"
+                            >
+                                <RiEyeOffLine className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <div className="p-6">
+                            <div className="bg-gray-50 rounded-lg p-4">
+                                <p className="text-gray-700 font-mono break-all">{previewEmail}</p>
+                            </div>
+                        </div>
+                        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+                            <button
+                                onClick={() => copyToClipboard(previewEmail)}
+                                className="px-4 py-2 text-sm font-medium text-teal-600 hover:text-teal-700 hover:bg-teal-50 rounded-lg transition-colors"
+                            >
+                                Copy Email
+                            </button>
+                            <button
+                                onClick={() => setShowEmailPreview(false)}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Delete Confirm Modal */}
             {showDeleteConfirm && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg p-6 max-w-md w-full">
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">
-                            {Array.isArray(emailToDelete) ? "Delete Selected Emails" : "Delete Email"}
-                        </h3>
-                        <p className="text-sm text-gray-500 mb-6">
-                            {Array.isArray(emailToDelete)
-                                ? `Are you sure you want to delete ${emailToDelete.length} selected emails? This will move them to the deleted list.`
-                                : `Are you sure you want to delete "${emailToDelete}"? This will move it to the deleted list.`}
-                        </p>
-                        <div className="flex justify-end gap-3">
+                    <div className="bg-white rounded-xl max-w-md w-full">
+                        <div className="px-6 py-5 border-b border-gray-200">
+                            <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                {Array.isArray(emailToDelete) ? "Delete Selected Emails" : "Delete Email"}
+                            </h3>
+                            <p className="text-sm text-gray-500">
+                                {Array.isArray(emailToDelete)
+                                    ? `Are you sure you want to delete ${emailToDelete.length} selected emails? This will move them to the deleted list.`
+                                    : `Are you sure you want to delete "${emailToDelete}"? This will move it to the deleted list.`}
+                            </p>
+                        </div>
+                        <div className="px-6 py-5 flex justify-end gap-3">
                             <button
                                 onClick={() => {
                                     setShowDeleteConfirm(false)
                                     setEmailToDelete(null)
                                 }}
                                 disabled={saving}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-800 disabled:opacity-50"
+                                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={confirmDelete}
                                 disabled={saving}
-                                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {saving ? 'Deleting...' : 'Delete'}
                             </button>
@@ -711,28 +836,30 @@ export default function EmailListPage() {
             {/* Permanent Delete Confirm Modal */}
             {showPermanentDeleteConfirm && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg p-6 max-w-md w-full">
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">
-                            Permanently Delete Email
-                        </h3>
-                        <p className="text-sm text-gray-500 mb-6">
-                            Are you sure you want to permanently delete "{emailToPermanentDelete}"? This action cannot be undone.
-                        </p>
-                        <div className="flex justify-end gap-3">
+                    <div className="bg-white rounded-xl max-w-md w-full">
+                        <div className="px-6 py-5 border-b border-gray-200">
+                            <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                Permanently Delete Email
+                            </h3>
+                            <p className="text-sm text-gray-500">
+                                Are you sure you want to permanently delete "{emailToPermanentDelete}"? This action cannot be undone.
+                            </p>
+                        </div>
+                        <div className="px-6 py-5 flex justify-end gap-3">
                             <button
                                 onClick={() => {
                                     setShowPermanentDeleteConfirm(false)
                                     setEmailToPermanentDelete(null)
                                 }}
                                 disabled={saving}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-800 disabled:opacity-50"
+                                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={confirmPermanentDelete}
                                 disabled={saving}
-                                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {saving ? 'Deleting...' : 'Permanently Delete'}
                             </button>
@@ -744,10 +871,10 @@ export default function EmailListPage() {
             {/* Saving Overlay */}
             {saving && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6">
+                    <div className="bg-white rounded-xl p-6">
                         <div className="flex items-center gap-3">
-                            <RiLoader4Line className="animate-spin h-6 w-6 text-indigo-600" />
-                            <span className="text-gray-700">Saving changes...</span>
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-teal-600"></div>
+                            <span className="text-gray-700 font-medium">Saving changes...</span>
                         </div>
                     </div>
                 </div>

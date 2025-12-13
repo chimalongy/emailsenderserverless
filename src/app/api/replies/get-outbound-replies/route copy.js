@@ -271,38 +271,20 @@ export async function POST(req) {
       accountReplies.forEach((reply) => {
         const sender_email = extractEmail(reply.from);
         
+        
         // Skip if we can't extract the sender email
         if (!sender_email) {
           return;
         }
-        
-        // Extract sender domain safely
-        const sender_email_parts = sender_email.split("@");
-        if (sender_email_parts.length !== 2) {
-          return; // Invalid email format
-        }
-        const sender_email_domain = sender_email_parts[1].toLowerCase();
+        let sender_email_domain= fromEmail.split("@");
+        sender_email_domain= sender_email_domain[1]
         
         const sender_subject = reply.subject || '';
         
-        // Check if reply matches any recipient (exact match or domain match)
-        if (uniqueByRecipients.some(emailItem => {
-          // Extract recipient domain safely
-          const recipient_parts = emailItem.recipient.split("@");
-          if (recipient_parts.length !== 2) {
-            // If recipient email is invalid, only check exact match
-            return emailItem.recipient === sender_email && sender_subject.includes(emailItem.subject);
-          }
-          const recipient_domain = recipient_parts[1].toLowerCase();
-          
-          // Match if: exact email match OR domain match
-          const emailMatches = emailItem.recipient === sender_email || recipient_domain === sender_email_domain;
-          
-          // Also check if subject contains the task subject
-          const subjectMatches = sender_subject.includes(emailItem.subject);
-          
-          return emailMatches && subjectMatches;
-        })) {
+        if (uniqueByRecipients.some(emailItem => 
+          (emailItem.recipient === sender_email || emailItem.recipient.split("@")[1].toLowerCase()==sender_email_domain) && 
+          sender_subject.includes(emailItem.subject)
+        )) {
           replies.push(reply);
         }
       });

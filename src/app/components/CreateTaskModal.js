@@ -3,6 +3,19 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from './AuthProvider'
 import { supabase } from '../lib/supabase'
+import {
+  FiCalendar,
+  FiClock,
+  FiMail,
+  FiType,
+  FiFileText,
+  FiSend,
+  FiX,
+  FiCheck,
+  FiAlertCircle,
+  FiHelpCircle
+} from 'react-icons/fi'
+import { HiOutlineDocumentText, HiOutlineExclamationCircle } from 'react-icons/hi'
 
 export default function CreateTaskModal({ isOpen, onClose, onSuccess, outbound }) {
   const { user } = useAuth()
@@ -78,7 +91,7 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess, outbound }
       // Auto-generate task name and default type/subject
       setFormData(prev => ({
         ...prev,
-        name: `Task${totalTasks + 1}`,
+        name: `Task ${totalTasks + 1}`,
         type: defaultType,
         subject: defaultType === 'followup' && latestNewSubject ? latestNewSubject : ''
       }))
@@ -108,8 +121,6 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess, outbound }
       }
 
       // Convert datetime-local to ISO string (UTC)
-      // datetime-local gives us "YYYY-MM-DDTHH:mm" in local time
-      // We need to convert it to UTC properly
       const localDate = new Date(formData.scheduled_at)
       if (isNaN(localDate.getTime())) {
         throw new Error('Invalid scheduled date and time')
@@ -145,12 +156,6 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess, outbound }
 
       /**
        * Build task-specific email_queue entries.
-       *
-       * Assumes the `outbounds` table has:
-       * - email_list: text (same format as AddOutboundModal)
-       * - allocations: jsonb (array in the same shape as AddOutboundModal.formData.allocations)
-       *
-       * Also assumes `email_queue` has a `task_id` column.
        */
       const { data: outboundConfig, error: outboundError } = await supabase
         .from('outbounds')
@@ -337,165 +342,244 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess, outbound }
   if (!isOpen || !outbound) return null
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b">
-          <h3 className="text-lg font-semibold">Create Task for {outbound.name}</h3>
-          <button
-            onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 text-2xl"
-          >
-            ×
-          </button>
-        </div>
-        
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {validationError && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-4">
-              <p className="text-sm text-red-800">{validationError}</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-white">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-gray-100 rounded-lg">
+              <HiOutlineDocumentText className="h-6 w-6 text-gray-700" />
             </div>
-          )}
-
-          {/* Campaign Info */}
-          <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-            <h4 className="font-medium text-blue-900 mb-2">Campaign Information</h4>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-blue-600">Campaign:</span>
-                <p className="font-medium">{outbound.name}</p>
-              </div>
-              <div>
-                <span className="text-blue-600">Active Email Accounts:</span>
-                <p className="font-medium">{emailAccounts.length}</p>
-              </div>
+            <div>
+              <h3 className="text-xl font-bold text-gray-900">Create New Task</h3>
+              <p className="text-sm text-gray-600 mt-1">for campaign "{outbound.name}"</p>
             </div>
           </div>
+          <button
+            onClick={handleClose}
+            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <FiX className="h-5 w-5" />
+          </button>
+        </div>
 
-          <div className="grid grid-cols-2 gap-4">
+        {/* Form Content - Scrollable */}
+        <div className="flex-1 overflow-y-auto p-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {validationError && (
+              <div className="p-4 bg-red-50 border-l-4 border-red-400 rounded-lg">
+                <p className="flex items-center text-sm text-red-600">
+                  <HiOutlineExclamationCircle className="mr-2 h-4 w-4" />
+                  {validationError}
+                </p>
+              </div>
+            )}
+
+            {/* Campaign Info */}
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-5">
+              <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                <FiMail className="mr-2 h-4 w-4 text-gray-600" />
+                Campaign Information
+              </h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Campaign Name</p>
+                  <p className="font-medium text-gray-900">{outbound.name}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Active Email Accounts</p>
+                  <p className="font-medium text-gray-900">{emailAccounts.length}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Existing Tasks</p>
+                  <p className="font-medium text-gray-900">{existingTasks}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Task Type</p>
+                  <p className="font-medium text-teal-600">
+                    {existingTasks === 0 ? 'First Task (New)' : 
+                     formData.type === 'new' ? 'New Emailing' : 'Follow-up'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="flex items-center text-sm font-semibold text-gray-900 mb-2">
+                  <FiType className="mr-2 h-4 w-4 text-gray-600" />
+                  Task Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Task 1"
+                />
+              </div>
+
+              <div>
+                <label className="flex items-center text-sm font-semibold text-gray-900 mb-2">
+                  <FiMail className="mr-2 h-4 w-4 text-gray-600" />
+                  Task Type *
+                </label>
+                <select
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
+                  value={formData.type}
+                  onChange={(e) => {
+                    const newType = e.target.value
+                    setFormData(prev => ({
+                      ...prev,
+                      type: newType,
+                      subject:
+                        newType === 'followup'
+                          ? (lastNewSubject || prev.subject)
+                          : '' // Clear subject for new tasks
+                    }))
+                  }}
+                >
+                  <option value="new">New Emailing</option>
+                  <option value="followup" disabled={existingTasks === 0}>
+                    Follow-up
+                  </option>
+                </select>
+                {existingTasks === 0 && formData.type === 'followup' && (
+                  <p className="text-xs text-amber-600 mt-2">
+                    <FiAlertCircle className="inline mr-1 h-3 w-3" />
+                    Create a new task first before using follow-up type
+                  </p>
+                )}
+              </div>
+            </div>
+
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Task Name *
+              <label className="flex items-center text-sm font-semibold text-gray-900 mb-2">
+                <FiFileText className="mr-2 h-4 w-4 text-gray-600" />
+                Email Subject *
               </label>
               <input
                 type="text"
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Task1"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
+                value={formData.subject}
+                onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                placeholder="Exciting opportunity for your business"
               />
+              {formData.type === 'followup' && lastNewSubject && (
+                <p className="text-xs text-gray-600 mt-2">
+                  <FiHelpCircle className="inline mr-1 h-3 w-3" />
+                  Using subject from previous new task as default
+                </p>
+              )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Task Type *
+              <label className="flex items-center text-sm font-semibold text-gray-900 mb-2">
+                <HiOutlineDocumentText className="mr-2 h-4 w-4 text-gray-600" />
+                Email Body *
               </label>
-              <select
+              <textarea
+                rows="8"
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                value={formData.type}
-                onChange={(e) => {
-                  const newType = e.target.value
-                  setFormData(prev => ({
-                    ...prev,
-                    type: newType,
-                    subject:
-                      newType === 'followup'
-                        ? (lastNewSubject || prev.subject)
-                        : '' // Clear subject for new tasks
-                  }))
-                }}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors resize-none"
+                value={formData.body}
+                onChange={(e) => setFormData({ ...formData, body: e.target.value })}
+                placeholder="Write your email message here..."
+              />
+              <div className="flex items-center justify-between mt-2">
+                <p className="text-xs text-gray-500">
+                  You can use variables like <code className="bg-gray-100 px-1 py-0.5 rounded">{`{name}`}</code> for personalization
+                </p>
+                <p className="text-xs text-gray-500">
+                  {formData.body.length} characters
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="flex items-center text-sm font-semibold text-gray-900 mb-2">
+                  <FiCalendar className="mr-2 h-4 w-4 text-gray-600" />
+                  Sending Date & Time *
+                </label>
+                <input
+                  type="datetime-local"
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
+                  value={formData.scheduled_at}
+                  onChange={(e) => setFormData({ ...formData, scheduled_at: e.target.value })}
+                  min={new Date().toISOString().slice(0, 16)}
+                />
+              </div>
+
+              <div>
+                <label className="flex items-center text-sm font-semibold text-gray-900 mb-2">
+                  <FiClock className="mr-2 h-4 w-4 text-gray-600" />
+                  Sending Rate *
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    max="60"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors pr-12"
+                    value={formData.send_rate}
+                    onChange={(e) => setFormData({ ...formData, send_rate: parseInt(e.target.value) })}
+                  />
+                  <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
+                    seconds
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Higher rates prevent spam flags and ensure better deliverability
+                </p>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        {/* Footer with Actions */}
+        <div className="border-t border-gray-200 p-6 bg-gray-50">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-600">
+              <div className="flex items-center">
+                <FiCheck className="mr-2 h-4 w-4 text-gray-600" />
+                Task will create {emailAccounts.length} email queue entries
+              </div>
+            </div>
+            <div className="flex items-center space-x-3">
+              <button
+                type="button"
+                onClick={handleClose}
+                className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
               >
-                <option value="new">New Emailing</option>
-                <option value="followup" disabled={existingTasks === 0}>
-                  Follow-up
-                </option>
-              </select>
+                Cancel
+              </button>
+              <button
+                type="submit"
+                onClick={handleSubmit}
+                disabled={loading}
+                className="px-5 py-2.5 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center"
+              >
+                {loading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Creating Task...
+                  </>
+                ) : (
+                  <>
+                    <FiSend className="mr-2 h-4 w-4" />
+                    Create Task
+                  </>
+                )}
+              </button>
             </div>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email Subject *
-            </label>
-            <input
-              type="text"
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-              value={formData.subject}
-              onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-              placeholder="Exciting opportunity for your business"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email Body *
-            </label>
-            <textarea
-              rows="8"
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-              value={formData.body}
-              onChange={(e) => setFormData({ ...formData, body: e.target.value })}
-              placeholder="Write your email message here..."
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              You can use variables like {`{name}`} for personalization (to be implemented)
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Sending Date & Time *
-              </label>
-              <input
-                type="datetime-local"
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                value={formData.scheduled_at}
-                onChange={(e) => setFormData({ ...formData, scheduled_at: e.target.value })}
-                min={new Date().toISOString().slice(0, 16)}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Sending Rate (seconds between emails) *
-              </label>
-              <input
-                type="number"
-                required
-                min="1"
-                max="60"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                value={formData.send_rate}
-                onChange={(e) => setFormData({ ...formData, send_rate: parseInt(e.target.value) })}
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Higher rates prevent spam flags
-              </p>
-            </div>
-          </div>
-
-          <div className="flex justify-end space-x-3 pt-4 border-t">
-            <button
-              type="button"
-              onClick={handleClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
-            >
-              {loading ? 'Creating Task...' : 'Create Task'}
-            </button>
-          </div>
-        </form>
+        </div>
       </div>
     </div>
   )
