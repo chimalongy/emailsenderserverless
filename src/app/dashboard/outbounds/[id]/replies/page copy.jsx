@@ -17,7 +17,6 @@ export default function OutboundRepliesPage() {
   const [showRawData, setShowRawData] = useState({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [sinceDays, setSinceDays] = useState(30)
   const [meta, setMeta] = useState(null)
   const [deletedEmailList, setDeletedEmailList] = useState([])
   const [replyModal, setReplyModal] = useState({
@@ -46,8 +45,6 @@ export default function OutboundRepliesPage() {
     const filtered = allReplies.filter(reply => {
       // Check if this is a bounce/delivery failure from mailer-daemon/postmaster
       const fromEmail = extractEmail(reply?.from || reply?.fromEmail || '')
-      // let fromEmailDomain= fromEmail.split("@");
-      // fromEmailDomain= fromEmailDomain[1].toLowerCase()
       const isBounceEmail = fromEmail.includes('mailer-daemon') || 
                            fromEmail.includes('mailer@') ||
                            fromEmail.includes('postmaster') ||
@@ -63,8 +60,8 @@ export default function OutboundRepliesPage() {
         // If we can't extract recipient email, show it (better to show than hide)
         return true
       } else {
-        // For regular replies, check if sender email is in deleted list // 
-        return !deletedEmailList.includes(fromEmail.toLowerCase()) 
+        // For regular replies, check if sender email is in deleted list
+        return !deletedEmailList.includes(fromEmail.toLowerCase())
       }
     })
 
@@ -96,7 +93,7 @@ export default function OutboundRepliesPage() {
         },
         body: JSON.stringify({
           outboundId,
-          sinceDays,
+          sinceDays: 30, // Default 30 days lookback
         }),
       })
 
@@ -110,19 +107,19 @@ export default function OutboundRepliesPage() {
       setMeta(result.meta || null)
       
       // Parse deleted emails (standardize on newline-separated format)
-      let deletedEmails = [];
+      let deletedEmails = []
       try {
         deletedEmails = (result.deleted_emails || '')
           .split('\n')
           .map(email => email.trim())
-          .filter(email => email.length > 0 && email.includes('@'));
+          .filter(email => email.length > 0 && email.includes('@'))
       } catch (err) {
-        console.error('Error parsing deleted emails:', err);
-        deletedEmails = [];
+        console.error('Error parsing deleted emails:', err)
+        deletedEmails = []
       }
       
-      setDeletedEmailList(deletedEmails);
-      console.log('Deleted emails loaded:', deletedEmails);
+      setDeletedEmailList(deletedEmails)
+      console.log('Deleted emails loaded:', deletedEmails)
 
     } catch (err) {
       console.error('Error loading replies:', err)
@@ -189,11 +186,12 @@ export default function OutboundRepliesPage() {
         throw new Error(result.message || 'Failed to send reply')
       }
 
-      // Optional: Show success notification or update UI
-      console.log('Reply sent successfully:', result)
+      // Show success notification
+      toast.success('Reply sent successfully!')
       
     } catch (err) {
       console.error('Error sending reply:', err)
+      toast.error('Failed to send reply: ' + err.message)
       throw err
     }
   }
@@ -463,65 +461,36 @@ export default function OutboundRepliesPage() {
     return isBounce ? 'bounce' : 'reply'
   }
 
-  const handleSinceDaysChange = (event) => {
-    const value = parseInt(event.target.value, 10)
-    if (Number.isNaN(value)) {
-      setSinceDays(30)
-      return
-    }
-    const clamped = Math.min(Math.max(value, 1), 120)
-    setSinceDays(clamped)
-  }
-
   const truncateText = (text, maxLength = 80) => {
     if (!text || text.length <= maxLength) return text
     return text.substring(0, maxLength) + '...'
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto px-4 py-6">
       {/* Header */}
       <div>
         <button
           onClick={() => router.push(`/dashboard/outbounds/${outboundId}`)}
-          className="inline-flex items-center text-sm text-indigo-600 hover:text-indigo-500 mb-4 group"
+          className="inline-flex items-center text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors group mb-5"
         >
           <svg className="w-4 h-4 mr-2 transition-transform group-hover:-translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
-          Back to Outbound
+          Back to Campaign
         </button>
-        <h1 className="text-2xl font-bold text-gray-900">Replies</h1>
-        <p className="text-gray-500 mt-1">
-          View and manage replies for this campaign
-        </p>
-      </div>
-
-      {/* Controls */}
-      <div className="bg-white shadow rounded-lg p-6">
-        <div className="space-y-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div className="w-full sm:w-64 text-left">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Lookback window (days)
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="120"
-                value={sinceDays}
-                onChange={handleSinceDaysChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Check Gmail for replies within this timeframe
-              </p>
-            </div>
-
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Campaign Replies</h1>
+            <p className="text-gray-500 mt-1">
+              View and manage replies for this campaign
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
             <button
               onClick={loadRecentReplies}
               disabled={loading}
-              className="inline-flex justify-center items-center px-6 py-3 bg-indigo-600 text-white font-medium rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex items-center px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-medium rounded-lg transition-all duration-200 active:scale-95 shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <>
@@ -529,52 +498,77 @@ export default function OutboundRepliesPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
-                  Loading replies...
+                  Loading...
                 </>
               ) : (
-                'Load replies'
+                <>
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh Replies
+                </>
               )}
             </button>
           </div>
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-md">
-              {error}
-            </div>
-          )}
-
-          {filteredReplies.length === 0 && !loading ? (
-            <div className="text-center py-12">
-              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-              <h3 className="mt-2 text-lg font-medium text-gray-900">No replies loaded yet</h3>
-              <p className="mt-1 text-gray-500">
-                Click the button above to fetch replies from Gmail
-              </p>
-            </div>
-          ) : null}
         </div>
       </div>
 
+      {/* Error State */}
+      {error && (
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-lg">
+          <div className="flex">
+            <svg className="h-5 w-5 text-red-400 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div className="flex-1 min-w-0">
+              <p className="text-red-800 font-medium truncate">Error loading replies</p>
+              <p className="text-red-700 mt-1 break-words text-sm">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {filteredReplies.length === 0 && !loading && !error && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 text-center py-12 px-4">
+          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-full flex items-center justify-center border border-teal-100">
+            <svg className="h-8 w-8 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <h3 className="mt-4 text-lg font-medium text-gray-900">No replies yet</h3>
+          <p className="mt-2 text-sm text-gray-500 max-w-md mx-auto">
+            Click the button above to fetch replies from the last 30 days
+          </p>
+        </div>
+      )}
+
       {/* Stats & Meta Info */}
       {filteredReplies.length > 0 && meta && (
-        <div className="bg-white shadow rounded-lg p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="text-center md:text-left">
-              <p className="text-sm text-gray-500">Total Replies</p>
-              <p className="text-2xl font-semibold text-gray-900">{filteredReplies.length}</p>
+              <p className="text-sm text-gray-500 font-medium">Total Replies</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">{filteredReplies.length}</p>
               <p className="text-xs text-gray-500 mt-1">
-                Filtered from {allReplies.length} total replies
+                Filtered from {allReplies.length} replies
               </p>
             </div>
             <div className="text-center">
-              <p className="text-sm text-gray-500">Lookback Period</p>
-              <p className="text-2xl font-semibold text-gray-900">{meta.sinceDays} days</p>
+              <p className="text-sm text-gray-500 font-medium">Regular Replies</p>
+              <p className="text-2xl font-bold text-emerald-600 mt-1">
+                {filteredReplies.filter(r => getReplyType(r) === 'reply').length}
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-gray-500 font-medium">Bounces</p>
+              <p className="text-2xl font-bold text-red-600 mt-1">
+                {filteredReplies.filter(r => getReplyType(r) === 'bounce').length}
+              </p>
             </div>
             <div className="text-center md:text-right">
-              <p className="text-sm text-gray-500">Deleted Emails</p>
-              <p className="text-2xl font-semibold text-gray-900">{deletedEmailList.length}</p>
+              <p className="text-sm text-gray-500 font-medium">Deleted Emails</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">{deletedEmailList.length}</p>
             </div>
           </div>
         </div>
@@ -582,7 +576,14 @@ export default function OutboundRepliesPage() {
 
       {/* Replies Accordion */}
       {filteredReplies.length > 0 && (
-        <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="p-5 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">All Replies</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Showing {filteredReplies.length} replies from the last 30 days
+            </p>
+          </div>
+          
           <ul className="divide-y divide-gray-200">
             {filteredReplies.map((reply) => {
               const replyId = reply.id || reply.messageId
@@ -598,7 +599,7 @@ export default function OutboundRepliesPage() {
                   {/* Accordion Header */}
                   <div
                     onClick={() => toggleAccordion(replyId)}
-                    className="w-full p-6 text-left hover:bg-gray-50 focus:outline-none focus:bg-gray-50 transition-colors cursor-pointer"
+                    className="w-full p-5 text-left hover:bg-gray-50 focus:outline-none focus:bg-gray-50 transition-colors cursor-pointer group"
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => {
@@ -610,53 +611,59 @@ export default function OutboundRepliesPage() {
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-lg font-medium text-gray-900 truncate">
-                            {truncateText(subject, 60)}
+                        <div className="flex items-center gap-3 mb-3">
+                          <h3 className="text-base font-medium text-gray-900 truncate group-hover:text-teal-600 transition-colors">
+                            {truncateText(subject, 70)}
                           </h3>
                           <span
-                            className={`px-2 py-1 text-xs font-semibold rounded-full flex-shrink-0 ${
+                            className={`px-2.5 py-1 text-xs font-semibold rounded-full flex-shrink-0 ${
                               replyType === 'bounce'
-                                ? 'bg-red-100 text-red-700'
-                                : 'bg-green-100 text-green-700'
+                                ? 'bg-red-50 text-red-700 border border-red-100'
+                                : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
                             }`}
                           >
                             {replyType === 'bounce' ? 'Bounce' : 'Reply'}
                           </span>
                         </div>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm text-gray-500">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm text-gray-600">
                           <div className="flex items-center gap-2">
-                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
-                            </svg>
-                            <span className="truncate">
+                            <div className="p-1.5 bg-gray-100 rounded">
+                              <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                              </svg>
+                            </div>
+                            <span className="truncate" title={fromName || fromEmail}>
                               {fromName || fromEmail}
                             </span>
                           </div>
                           
                           <div className="flex items-center gap-2">
-                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                            </svg>
-                            <span className="truncate">{toEmail}</span>
+                            <div className="p-1.5 bg-gray-100 rounded">
+                              <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                              </svg>
+                            </div>
+                            <span className="truncate" title={toEmail}>{toEmail}</span>
                           </div>
                           
                           <div className="flex items-center gap-2">
-                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
+                            <div className="p-1.5 bg-gray-100 rounded">
+                              <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                            </div>
                             <span>{formatDate(reply.date)}</span>
                           </div>
                         </div>
                       </div>
                       
-                      <div className="flex items-center gap-4 ml-4 flex-shrink-0">
+                      <div className="flex items-center gap-3 ml-4 flex-shrink-0">
                         {/* Delete button */}
                         <span onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={(e) => handleDeleteFromList(fromEmail, replyId, e)}
-                            className="p-2 text-gray-400 hover:text-red-600 focus:outline-none focus:text-red-600"
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-100"
                             title="Delete from email list"
                           >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -681,24 +688,24 @@ export default function OutboundRepliesPage() {
                   
                   {/* Accordion Content */}
                   {isExpanded && (
-                    <div className="px-6 pb-6 animate-slideDown">
-                      <div className="space-y-4 pt-4 border-t border-gray-200">
+                    <div className="px-5 pb-5 animate-slideDown">
+                      <div className="space-y-5 pt-5 border-t border-gray-200">
                         {/* Email Body */}
                         <div>
-                          <h4 className="text-sm font-medium text-gray-700 mb-2">Message</h4>
-                          <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
-                            <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans">
+                          <h4 className="text-sm font-medium text-gray-700 mb-3">Message Content</h4>
+                          <div className="bg-gray-50 rounded-xl p-4 max-h-96 overflow-y-auto border border-gray-200">
+                            <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">
                               {getBodyPreview(reply)}
                             </pre>
                           </div>
                         </div>
                         
                         {/* Actions */}
-                        <div className="flex gap-3">
+                        <div className="flex flex-wrap gap-3">
                           {replyType !== 'bounce' && (
                             <button
                               onClick={(e) => handleReply(reply, e)}
-                              className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
+                              className="inline-flex items-center px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-medium rounded-lg transition-all duration-200 active:scale-95 shadow-sm hover:shadow"
                             >
                               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -709,7 +716,7 @@ export default function OutboundRepliesPage() {
                           
                           <button
                             onClick={(e) => toggleRawData(replyId, e)}
-                            className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 transition-colors"
+                            className="inline-flex items-center px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors"
                           >
                             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
@@ -720,9 +727,9 @@ export default function OutboundRepliesPage() {
                         
                         {/* Raw Data */}
                         {showRawData[replyId] && (
-                          <div className="mt-4">
-                            <h4 className="text-sm font-medium text-gray-700 mb-2">Raw Email Data</h4>
-                            <div className="bg-gray-900 rounded-lg p-4 overflow-auto">
+                          <div className="mt-5">
+                            <h4 className="text-sm font-medium text-gray-700 mb-3">Raw Email Data</h4>
+                            <div className="bg-gray-900 rounded-xl p-4 overflow-auto">
                               <pre className="text-sm text-gray-300 font-mono">
                                 {JSON.stringify(reply, null, 2)}
                               </pre>

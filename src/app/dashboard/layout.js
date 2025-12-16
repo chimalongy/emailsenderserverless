@@ -15,7 +15,8 @@ import {
   FaPaperPlane,
   FaChevronDown,
   FaHome,
-  FaChevronRight
+  FaChevronRight,
+  FaSearch
 } from 'react-icons/fa'
 
 export default function DashboardLayout({ children }) {
@@ -109,6 +110,12 @@ export default function DashboardLayout({ children }) {
       icon: <FaPaperPlane className="w-5 h-5" />,
       description: 'Manage campaigns'
     },
+    { 
+      name: 'Scrape Emails', 
+      href: '/dashboard/scrape-emails', 
+      icon: <FaSearch className="w-5 h-5" />,
+      description: 'Find and scrape email addresses'
+    },
   ]
 
   const userNavigation = [
@@ -120,6 +127,7 @@ export default function DashboardLayout({ children }) {
     if (pathname === '/dashboard/emails') return 'Email Accounts'
     if (pathname === '/dashboard/outbounds') return 'Campaigns'
     if (pathname === '/dashboard/settings') return 'Settings'
+    if (pathname === '/dashboard/scrape-emails') return 'Scrape Emails'
     return pathname.split('/').pop()?.replace('-', ' ') || ''
   }
 
@@ -388,6 +396,7 @@ export default function DashboardLayout({ children }) {
                   {pathname === '/dashboard/emails' && 'Manage your email accounts and connections'}
                   {pathname === '/dashboard/outbounds' && 'Create and manage your outreach campaigns'}
                   {pathname === '/dashboard/settings' && 'Manage your account settings'}
+                  {pathname === '/dashboard/scrape-emails' && 'Find and scrape email addresses for your campaigns'}
                 </p>
               </div>
               
@@ -430,6 +439,14 @@ export default function DashboardLayout({ children }) {
             <p className="text-xs sm:text-sm text-gray-500">
               MailFlow • {new Date().getFullYear()} • Professional Email Automation
             </p>
+            <div className="mt-2">
+              <Link 
+                href="/dashboard/settings" 
+                className="text-xs text-teal-600 hover:text-teal-700 hover:underline"
+              >
+                Need help? Contact support
+              </Link>
+            </div>
           </footer>
         </div>
       </main>

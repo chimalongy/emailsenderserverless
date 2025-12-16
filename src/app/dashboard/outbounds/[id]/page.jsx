@@ -13,52 +13,40 @@ import {
   FiPlus,
   FiCalendar,
   FiEdit2,
-  FiEye,
-  FiFileText,
   FiClock,
   FiCheckCircle,
   FiPauseCircle,
   FiPlayCircle,
   FiAlertCircle,
   FiRefreshCw,
-  FiExternalLink,
   FiChevronRight,
-  FiFilter,
-  FiTrendingUp,
-  FiMoreVertical
+  FiMoreVertical,
+  FiFileText
 } from 'react-icons/fi'
-import {
-  HiOutlineMail,
-  HiOutlineChatAlt2,
-  HiOutlineCalendar,
-  HiOutlineDocumentText,
-  HiOutlineStatusOnline,
-  HiOutlineTag
-} from 'react-icons/hi'
 
-// Custom components
+// Custom components with mobile optimizations
 const LoadingSpinner = () => (
-  <div className="flex flex-col items-center justify-center min-h-96 space-y-4">
-    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500"></div>
-    <p className="text-gray-500">Loading outbound details...</p>
+  <div className="flex flex-col items-center justify-center min-h-80 space-y-3 p-4">
+    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-teal-500"></div>
+    <p className="text-gray-500 text-sm">Loading campaign details...</p>
   </div>
 )
 
 const ErrorState = ({ error, onBack }) => (
-  <div className="space-y-4">
+  <div className="space-y-3 p-3">
     <button
       onClick={onBack}
-      className="flex items-center text-sm text-teal-600 hover:text-teal-500 transition-colors group"
+      className="flex items-center text-xs text-teal-600 hover:text-teal-500 transition-colors group"
     >
-      <FiArrowLeft className="mr-2 transition-transform group-hover:-translate-x-1" />
-      Back to Outbounds
+      <FiArrowLeft className="mr-1.5 h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
+      Back to Campaigns
     </button>
-    <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-lg">
+    <div className="bg-red-50 border-l-3 border-red-400 p-3 rounded">
       <div className="flex">
-        <FiAlertCircle className="h-5 w-5 text-red-400 mr-3 flex-shrink-0 mt-0.5" />
-        <div className="flex-1 min-w-0">
-          <p className="text-red-800 font-medium truncate">Error loading outbound</p>
-          <p className="text-red-700 mt-1 break-words text-sm">{error}</p>
+        <FiAlertCircle className="h-4 w-4 text-red-400 mr-2 flex-shrink-0 mt-0.5" />
+        <div className="flex-1">
+          <p className="text-red-800 font-medium text-sm">Error loading campaign</p>
+          <p className="text-red-700 text-xs break-words mt-1">{error}</p>
         </div>
       </div>
     </div>
@@ -67,19 +55,19 @@ const ErrorState = ({ error, onBack }) => (
 
 const TaskStatusBadge = ({ status }) => {
   const config = {
-    scheduled: { color: 'bg-blue-50 text-blue-700 border border-blue-100', icon: FiClock },
-    in_progress: { color: 'bg-amber-50 text-amber-700 border border-amber-100', icon: FiRefreshCw },
-    completed: { color: 'bg-emerald-50 text-emerald-700 border border-emerald-100', icon: FiCheckCircle },
-    failed: { color: 'bg-red-50 text-red-700 border border-red-100', icon: FiAlertCircle },
-    paused: { color: 'bg-gray-50 text-gray-700 border border-gray-100', icon: FiPauseCircle },
+    scheduled: { color: 'bg-blue-50 text-blue-700', icon: FiClock },
+    in_progress: { color: 'bg-amber-50 text-amber-700', icon: FiRefreshCw },
+    completed: { color: 'bg-emerald-50 text-emerald-700', icon: FiCheckCircle },
+    failed: { color: 'bg-red-50 text-red-700', icon: FiAlertCircle },
+    paused: { color: 'bg-gray-50 text-gray-700', icon: FiPauseCircle },
   }
 
   const { color, icon: Icon } = config[status] || config.scheduled
   const label = status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')
 
   return (
-    <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${color} flex-shrink-0`}>
-      <Icon className="mr-1.5 h-3.5 w-3.5" />
+    <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-medium ${color} flex-shrink-0`}>
+      <Icon className="mr-1 h-3 w-3" />
       <span className="truncate">{label}</span>
     </span>
   )
@@ -87,20 +75,20 @@ const TaskStatusBadge = ({ status }) => {
 
 const ActionButton = ({ icon: Icon, label, onClick, variant = 'primary', className = '', showLabel = true }) => {
   const variants = {
-    primary: 'bg-teal-600 hover:bg-teal-700 text-white shadow-sm hover:shadow transition-all duration-200',
-    secondary: 'bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 hover:border-gray-300',
-    success: 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm hover:shadow',
-    blue: 'bg-sky-600 hover:bg-sky-700 text-white shadow-sm hover:shadow',
+    primary: 'bg-teal-600 hover:bg-teal-700 text-white',
+    secondary: 'bg-white border border-gray-200 hover:bg-gray-50 text-gray-700',
+    success: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+    blue: 'bg-sky-600 hover:bg-sky-700 text-white',
     ghost: 'bg-transparent hover:bg-gray-50 text-gray-600 hover:text-gray-900 border border-gray-200',
   }
 
   return (
     <button
       onClick={onClick}
-      className={`inline-flex items-center px-3.5 sm:px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 active:scale-95 ${variants[variant]} ${className} flex-shrink-0`}
+      className={`inline-flex items-center p-2 rounded-lg text-xs transition-colors ${variants[variant]} ${className} flex-shrink-0`}
       title={!showLabel ? label : undefined}
     >
-      <Icon className="h-4 w-4 sm:mr-2 flex-shrink-0" />
+      <Icon className="h-3.5 w-3.5 sm:mr-1.5 flex-shrink-0" />
       {showLabel && <span className="hidden sm:inline">{label}</span>}
       {!showLabel && <span className="sr-only">{label}</span>}
     </button>
@@ -109,22 +97,22 @@ const ActionButton = ({ icon: Icon, label, onClick, variant = 'primary', classNa
 
 const OutboundStatusBadge = ({ status }) => {
   const statusConfig = {
-    active: { label: 'Active', className: 'bg-emerald-50 text-emerald-700 border border-emerald-100' },
-    paused: { label: 'Paused', className: 'bg-amber-50 text-amber-700 border border-amber-100' },
-    completed: { label: 'Completed', className: 'bg-sky-50 text-sky-700 border border-sky-100' },
-    draft: { label: 'Draft', className: 'bg-gray-50 text-gray-700 border border-gray-100' },
+    active: { label: 'Active', className: 'bg-emerald-50 text-emerald-700' },
+    paused: { label: 'Paused', className: 'bg-amber-50 text-amber-700' },
+    completed: { label: 'Completed', className: 'bg-sky-50 text-sky-700' },
+    draft: { label: 'Draft', className: 'bg-gray-50 text-gray-700' },
   }
 
   const config = statusConfig[status] || statusConfig.draft
   
   return (
-    <span className={`px-3 py-1.5 text-xs font-medium rounded-full ${config.className} flex-shrink-0`}>
+    <span className={`px-2 py-1 text-[10px] font-medium rounded-full ${config.className} flex-shrink-0`}>
       {config.label}
     </span>
   )
 }
 
-// Stats Card Component
+// Compact Stats Card Component
 const StatsCard = ({ icon: Icon, label, value, color = 'teal' }) => {
   const colors = {
     teal: 'bg-teal-50 text-teal-600',
@@ -135,14 +123,14 @@ const StatsCard = ({ icon: Icon, label, value, color = 'teal' }) => {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-sm transition-shadow duration-200">
-      <div className="flex items-center gap-3">
-        <div className={`p-2 rounded-lg ${colors[color]}`}>
-          <Icon className="h-5 w-5" />
+    <div className="bg-white rounded-lg border border-gray-200 p-2">
+      <div className="flex items-center gap-2">
+        <div className={`p-1.5 rounded ${colors[color]}`}>
+          <Icon className="h-4 w-4" />
         </div>
         <div>
-          <p className="text-2xl font-bold text-gray-900">{value}</p>
-          <p className="text-sm text-gray-500 mt-0.5">{label}</p>
+          <p className="text-base font-bold text-gray-900">{value}</p>
+          <p className="text-xs text-gray-500">{label}</p>
         </div>
       </div>
     </div>
@@ -175,7 +163,6 @@ export default function OutboundDetailPage() {
     setError('')
 
     try {
-      // Fetch outbound
       const { data: outboundData, error: outboundError } = await supabase
         .from('outbounds')
         .select('*')
@@ -185,7 +172,7 @@ export default function OutboundDetailPage() {
 
       if (outboundError) throw outboundError
       if (!outboundData) {
-        setError('Outbound not found or you do not have access to it.')
+        setError('Campaign not found or you do not have access to it.')
         setLoading(false)
         setRefreshing(false)
         return
@@ -193,7 +180,6 @@ export default function OutboundDetailPage() {
 
       setOutbound(outboundData)
 
-      // Fetch tasks
       const { data: tasksData, error: tasksError } = await supabase
         .from('tasks')
         .select('*')
@@ -204,8 +190,8 @@ export default function OutboundDetailPage() {
 
       setTasks(tasksData || [])
     } catch (err) {
-      console.error('Error loading outbound detail:', err)
-      setError(err.message || 'Failed to load outbound details.')
+      console.error('Error loading campaign detail:', err)
+      setError(err.message || 'Failed to load campaign details.')
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -219,7 +205,6 @@ export default function OutboundDetailPage() {
 
   const loadTaskWithAllocations = async (task) => {
     try {
-      // Fetch allocations for this task
       const { data, error } = await supabase
         .from('email_queue')
         .select(`
@@ -294,108 +279,98 @@ export default function OutboundDetailPage() {
   if (!outbound) return null
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4">
+    <div className="space-y-3 max-w-7xl mx-auto px-2 py-2 sm:px-4 lg:px-8">
       {/* Header with back button and refresh */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between gap-2">
         <button
           onClick={() => router.push('/dashboard/outbounds')}
-          className="inline-flex items-center text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors group"
+          className="inline-flex items-center text-xs font-medium text-gray-600 hover:text-gray-900 transition-colors group flex-shrink-0"
         >
-          <FiArrowLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1" />
-          <span className="truncate">Back to Outbounds</span>
+          <FiArrowLeft className="mr-1.5 h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
+          <span className="truncate hidden sm:inline">Back to Campaigns</span>
+          <span className="truncate sm:hidden">Back</span>
         </button>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 transition-colors disabled:opacity-50 group"
+            className="inline-flex items-center text-xs text-gray-600 hover:text-gray-900 transition-colors disabled:opacity-50 p-1.5"
+            title="Refresh"
           >
-            <FiRefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''} group-hover:rotate-180 transition-transform duration-300`} />
-            <span className="hidden sm:inline">{refreshing ? 'Refreshing...' : 'Refresh'}</span>
-            <span className="sm:hidden">{refreshing ? '...' : 'Refresh'}</span>
+            <FiRefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
           <button
             onClick={() => setIsCreateTaskModalOpen(true)}
-            className="inline-flex items-center px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-all duration-200 active:scale-95 shadow-sm hover:shadow"
+            className="inline-flex items-center p-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-medium rounded-lg transition-colors"
+            title="New Task"
           >
-            <FiPlus className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">New Task</span>
+            <FiPlus className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline ml-1">New Task</span>
           </button>
         </div>
       </div>
 
-      {/* Outbound header */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-5 sm:p-6">
-          <div className="flex flex-col lg:flex-row lg:items-start gap-5">
+      {/* Outbound header - Mobile Optimized */}
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="p-3 sm:p-4">
+          <div className="flex flex-col gap-3">
             {/* Main content */}
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4">
-                <div className="p-3 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-xl border border-teal-100 flex-shrink-0">
-                  <HiOutlineDocumentText className="h-7 w-7 text-teal-600" />
+            <div className="flex-1">
+              <div className="flex gap-2">
+                <div className="p-2 bg-teal-50 rounded-lg border border-teal-100 flex-shrink-0">
+                  <FiFileText className="h-5 w-5 text-teal-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate" title={outbound.name}>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="min-w-0">
+                      <h1 className="text-base font-bold text-gray-900 truncate" title={outbound.name}>
                         {outbound.name}
                       </h1>
-                      <div className="sm:hidden">
-                        <OutboundStatusBadge status={outbound.status} />
-                      </div>
                     </div>
-                    <div className="hidden sm:block">
-                      <OutboundStatusBadge status={outbound.status} />
-                    </div>
+                    <OutboundStatusBadge status={outbound.status} />
                   </div>
                   
                   {/* Description */}
                   {outbound.description && (
-                    <p className="text-sm text-gray-600 mb-4 break-words leading-relaxed">
+                    <p className="text-xs text-gray-600 mb-3 line-clamp-2 break-words leading-relaxed">
                       {outbound.description}
                     </p>
                   )}
                   
                   {/* Metadata */}
-                  <div className="flex flex-wrap gap-3 text-sm text-gray-500">
-                    <span className="flex items-center bg-gray-50 px-3 py-1.5 rounded-lg">
-                      <FiCalendar className="mr-2 h-4 w-4 text-gray-400" />
-                      Created {new Date(outbound.created_at).toLocaleDateString()}
+                  <div className="flex flex-wrap gap-1.5 text-xs text-gray-500">
+                    <span className="flex items-center bg-gray-50 px-2 py-1 rounded">
+                      <FiCalendar className="mr-1.5 h-3 w-3 text-gray-400" />
+                      {new Date(outbound.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </span>
-                    {outbound.updated_at && (
-                      <span className="flex items-center bg-gray-50 px-3 py-1.5 rounded-lg">
-                        <FiClock className="mr-2 h-4 w-4 text-gray-400" />
-                        Updated {new Date(outbound.updated_at).toLocaleDateString()}
-                      </span>
-                    )}
                   </div>
                 </div>
               </div>
 
               {/* Quick actions */}
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <div className="flex flex-wrap gap-2 sm:gap-3">
+              <div className="mt-4 pt-3 border-t border-gray-200">
+                <div className="flex flex-wrap gap-1.5">
                   <ActionButton
-                    icon={HiOutlineMail}
-                    label="View Email List"
+                    icon={FiMail}
+                    label="Email List"
                     onClick={navigateToEmailList}
                     variant="blue"
                   />
                   <ActionButton
-                    icon={HiOutlineChatAlt2}
-                    label="View Replies"
+                    icon={FiMessageSquare}
+                    label="Replies"
                     onClick={navigateToReplies}
                     variant="success"
                   />
                   <ActionButton
                     icon={FiEdit2}
-                    label="Edit Campaign"
+                    label="Edit"
                     onClick={() => {}}
                     variant="secondary"
                   />
                   
-                  {/* Mobile: More actions dropdown */}
-                  <div className="relative sm:hidden">
+                  {/* More actions dropdown */}
+                  <div className="relative">
                     <ActionButton
                       icon={FiMoreVertical}
                       label="More"
@@ -410,28 +385,26 @@ export default function OutboundDetailPage() {
                           className="fixed inset-0 z-10"
                           onClick={() => setShowMoreActions(false)}
                         />
-                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20 py-1">
+                        <div className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-20 py-1">
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              // Add additional actions here
                               setShowMoreActions(false)
                             }}
-                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                            className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 flex items-center"
                           >
-                            <FiFileText className="mr-3 h-4 w-4" />
-                            Duplicate Campaign
+                            <FiFileText className="mr-2 h-3.5 w-3.5" />
+                            Duplicate
                           </button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              // Add delete action here
                               setShowMoreActions(false)
                             }}
-                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
+                            className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50 flex items-center"
                           >
-                            <FiAlertCircle className="mr-3 h-4 w-4" />
-                            Delete Campaign
+                            <FiAlertCircle className="mr-2 h-3.5 w-3.5" />
+                            Delete
                           </button>
                         </div>
                       </>
@@ -441,27 +414,25 @@ export default function OutboundDetailPage() {
               </div>
             </div>
 
-            {/* Stats sidebar */}
-            <div className="lg:w-64 flex-shrink-0">
-              <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
-                <h3 className="text-sm font-medium text-gray-700 mb-3">Campaign Stats</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-600">Total Tasks</span>
-                    <span className="font-medium text-gray-900">{taskStats.total}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-600">Completed</span>
-                    <span className="font-medium text-emerald-600">{taskStats.completed}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-600">In Progress</span>
-                    <span className="font-medium text-amber-600">{taskStats.in_progress}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-600">Scheduled</span>
-                    <span className="font-medium text-sky-600">{taskStats.scheduled}</span>
-                  </div>
+            {/* Stats - Horizontal on mobile */}
+            <div className="mt-3 pt-3 border-t border-gray-200">
+              <h3 className="text-xs font-medium text-gray-700 mb-2">Campaign Stats</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="text-center">
+                  <p className="text-lg font-bold text-gray-900">{taskStats.total}</p>
+                  <p className="text-xs text-gray-500">Total</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-bold text-emerald-600">{taskStats.completed}</p>
+                  <p className="text-xs text-gray-500">Completed</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-bold text-amber-600">{taskStats.in_progress}</p>
+                  <p className="text-xs text-gray-500">In Progress</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-bold text-sky-600">{taskStats.scheduled}</p>
+                  <p className="text-xs text-gray-500">Scheduled</p>
                 </div>
               </div>
             </div>
@@ -469,66 +440,59 @@ export default function OutboundDetailPage() {
         </div>
       </div>
 
-      {/* Tasks section */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-5 sm:p-6 border-b border-gray-200">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="p-2.5 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-lg border border-teal-100 flex-shrink-0">
-                <HiOutlineCalendar className="h-5 w-5 text-teal-600" />
+      {/* Tasks section - Mobile Optimized */}
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="p-3 sm:p-4 border-b border-gray-200">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="p-1.5 bg-teal-50 rounded border border-teal-100 flex-shrink-0">
+                <FiCalendar className="h-4 w-4 text-teal-600" />
               </div>
-              <div className="min-w-0 flex-1">
-                <h2 className="text-lg font-semibold text-gray-900 truncate">Campaign Tasks</h2>
-                <p className="text-sm text-gray-500 mt-1 truncate">
-                  Manage all email sending tasks for this campaign
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="px-3 py-1.5 bg-gray-50 rounded-lg border border-gray-200">
-                <span className="text-sm font-medium text-gray-700">
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold text-gray-900 truncate">Tasks</h2>
+                <p className="text-xs text-gray-500 truncate">
                   {tasks.length} task{tasks.length === 1 ? '' : 's'}
-                </span>
+                </p>
               </div>
             </div>
           </div>
         </div>
 
         {tasks.length === 0 ? (
-          <div className="text-center py-12 sm:py-16 px-4">
-            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-full flex items-center justify-center border border-teal-100">
-              <HiOutlineCalendar className="h-7 w-7 text-teal-500" />
+          <div className="text-center py-6 px-3">
+            <div className="mx-auto w-12 h-12 bg-teal-50 rounded-full flex items-center justify-center border border-teal-100">
+              <FiCalendar className="h-5 w-5 text-teal-500" />
             </div>
-            <h3 className="mt-4 text-lg font-medium text-gray-900">No tasks created yet</h3>
-            <p className="mt-2 text-sm text-gray-500 max-w-md mx-auto">
-              Tasks organize your email sending schedule. Create your first task to start this campaign.
+            <h3 className="mt-2 text-sm font-medium text-gray-900">No tasks yet</h3>
+            <p className="mt-1 text-xs text-gray-500">
+              Create your first task to start this campaign
             </p>
             <button
               onClick={() => setIsCreateTaskModalOpen(true)}
-              className="mt-6 inline-flex items-center px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-medium rounded-lg transition-all duration-200 active:scale-95 shadow-sm hover:shadow"
+              className="mt-3 inline-flex items-center px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-medium rounded-lg transition-colors"
             >
-              <FiPlus className="h-4 w-4 mr-2" />
-              Create First Task
+              <FiPlus className="h-3.5 w-3.5 mr-1.5" />
+              Create Task
             </button>
           </div>
         ) : (
           <div className="divide-y divide-gray-200">
-            {tasks.map((task, index) => (
+            {tasks.map((task) => (
               <div
                 key={task.id}
-                className="p-5 hover:bg-gray-50 transition-colors cursor-pointer group"
+                className="p-3 hover:bg-gray-50 transition-colors cursor-pointer group"
                 onClick={() => loadTaskWithAllocations(task)}
               >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 bg-gray-50 rounded-lg border border-gray-200 group-hover:border-gray-300 flex-shrink-0 mt-0.5">
-                        <HiOutlineStatusOnline className="h-4 w-4 text-gray-500" />
+                    <div className="flex items-start gap-2">
+                      <div className="p-1.5 bg-gray-50 rounded border border-gray-200 flex-shrink-0 mt-0.5">
+                        <FiClock className="h-3.5 w-3.5 text-gray-500" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
                           <h3 
-                            className="font-medium text-gray-900 truncate min-w-0 flex-1 group-hover:text-teal-600 transition-colors"
+                            className="text-sm font-medium text-gray-900 truncate min-w-0 flex-1"
                             title={task.name}
                           >
                             {task.name}
@@ -537,41 +501,34 @@ export default function OutboundDetailPage() {
                         </div>
                         
                         {task.description && (
-                          <p className="text-sm text-gray-600 mb-3 line-clamp-2 break-words leading-relaxed">
+                          <p className="text-xs text-gray-600 mb-2 line-clamp-1 break-words">
                             {task.description}
                           </p>
                         )}
                         
-                        <div className="flex flex-wrap gap-2 text-xs text-gray-500">
-                          <span className="flex items-center bg-gray-50 px-2.5 py-1 rounded-lg">
-                            <HiOutlineTag className="mr-1.5 h-3.5 w-3.5" />
-                            {task.type === 'followup' ? 'Follow-up Task' : 'Initial Outreach'}
+                        <div className="flex flex-wrap gap-1 text-[10px] text-gray-500">
+                          <span className="bg-gray-50 px-2 py-0.5 rounded">
+                            {task.type === 'followup' ? 'Follow-up' : 'Initial'}
                           </span>
                           {task.scheduled_at && (
-                            <span className="flex items-center bg-gray-50 px-2.5 py-1 rounded-lg">
-                              <FiCalendar className="mr-1.5 h-3.5 w-3.5" />
-                              {new Date(task.scheduled_at).toLocaleDateString()}
+                            <span className="bg-gray-50 px-2 py-0.5 rounded">
+                              {new Date(task.scheduled_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                             </span>
                           )}
-                          <span className="flex items-center bg-gray-50 px-2.5 py-1 rounded-lg">
-                            <FiClock className="mr-1.5 h-3.5 w-3.5" />
-                            Created {new Date(task.created_at).toLocaleDateString()}
-                          </span>
                         </div>
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                  <div className="flex items-center self-start">
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
                         loadTaskWithAllocations(task)
                       }}
-                      className="inline-flex items-center text-sm font-medium text-teal-600 hover:text-teal-700 transition-colors group/view"
+                      className="p-1 text-gray-400 hover:text-teal-600 transition-colors"
+                      title="View Details"
                     >
-                      <span className="hidden sm:inline">View Details</span>
-                      <span className="sm:hidden">View</span>
-                      <FiChevronRight className="ml-1 h-4 w-4 transition-transform group-hover/view:translate-x-1" />
+                      <FiChevronRight className="h-4 w-4" />
                     </button>
                   </div>
                 </div>

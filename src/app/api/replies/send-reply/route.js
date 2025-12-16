@@ -159,6 +159,18 @@ export async function POST(request) {
     //console.log(sentEmails)
     //let first_task_message =  sentEmails.filter((sntemail)=>sntemail.)
 
+
+
+
+
+ let emailbody = emailBody.replace(/\n/g, '<br>')
+    emailbody=emailBody+'<br><br>'
+    let email_signature = account.signature.replace(/\n/g, '<br>')
+
+    emailbody=emailbody+email_signature
+
+
+
     const transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
@@ -187,7 +199,7 @@ export async function POST(request) {
       replyId,
       to,
       subject,
-      emailBody,
+      emailbody,
     });
 
     // Simulate delay
