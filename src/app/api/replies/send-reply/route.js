@@ -199,7 +199,7 @@ console.log(JSON.stringify(account))
     console.log(info);
 
     // Your email sending logic here
-    console.log("Sending reply:", {
+    console.log("Sending reply:", { 
       outboundId,
       replyId,
       to,

@@ -1,7 +1,6 @@
 // app/api/scrappings/start-scrapping/route.js
 import { NextResponse } from 'next/server'
-import { client } from "../../../lib/scrapping/trigger";
-import { tasks } from "@trigger.dev/sdk";
+
 
 export async function POST(req) {
   try {
@@ -52,11 +51,6 @@ export async function POST(req) {
     //         : [], // query-based handled later
     //   },
     // });
-
-    const handle = await tasks.trigger("email-scrape", {
-      scrappingId: scrapping.id,
-      urls: scrapping.urls || [],
-    });
 
     
 
