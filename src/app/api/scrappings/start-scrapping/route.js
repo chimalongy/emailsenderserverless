@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { client } from "@/trigger/client";
+
 
 
 export async function POST(req) {
