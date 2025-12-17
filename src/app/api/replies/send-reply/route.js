@@ -129,7 +129,7 @@ export async function POST(request) {
 
     let { data: email_account, error: accountsError } = await supabase
       .from("email_accounts")
-      .select("id, email, sender_name, app_password")
+      .select("id, email, sender_name, app_password, signature")
       .eq("user_id", user.id)
       .eq("email", accountEmail);
 
@@ -140,7 +140,7 @@ export async function POST(request) {
         let account = email_account[0];
         email_account=account
 
-    console.log(email_account);
+    ///console.log(email_account);
 
     const queueEntries = sentEmails.filter(
       (email) => email.account_id === email_account.id
@@ -161,15 +161,20 @@ export async function POST(request) {
 
 
 
-
+ 
 
  let emailbody = emailBody.replace(/\n/g, '<br>')
     emailbody=emailBody+'<br><br>'
+
+console.log(emailBody)
+
+console.log(JSON.stringify(account))
     let email_signature = account.signature.replace(/\n/g, '<br>')
+
 
     emailbody=emailbody+email_signature
 
-
+        console.log("THIS IS EMAIL BODY",emailbody)
 
     const transporter = nodemailer.createTransport({
         service: 'gmail',
@@ -188,7 +193,7 @@ export async function POST(request) {
       inReplyTo: inReplyTo,
       references: [inReplyTo],
 
-      html: emailBody,
+      html: emailbody,
     });
 
     console.log(info);
