@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { FaEnvelope, FaPlus, FaFolder, FaFileAlt, FaTrash, FaDownload, FaCalendarAlt, FaSpinner, FaExclamationCircle, FaSync } from 'react-icons/fa'
+import { FaEnvelope, FaPlus, FaFolder, FaFileAlt, FaTrash, FaDownload, FaCalendarAlt, FaSpinner,FaSearch , FaExclamationCircle, FaSync } from 'react-icons/fa'
 import SearchModal from './components/searchmodal'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from "../../components/AuthProvider"

@@ -1,16 +1,16 @@
-// app/api/scrappings/start-scrapping/route.js
-import { NextResponse } from 'next/server'
-
+import { NextResponse } from "next/server";
+import { client } from "@/trigger/client";
+import { scrapeEmailsTask } from "@/trigger/scrapeEmails";
 
 export async function POST(req) {
   try {
-    const { scrapping } = await req.json()
+    const { scrapping } = await req.json();
 
     if (!scrapping) {
       return NextResponse.json(
-        { error: 'Missing scrapping data' },
+        { error: "Missing scrapping data" },
         { status: 400 }
-      )
+      );
     }
 
     const {
@@ -19,59 +19,33 @@ export async function POST(req) {
       method,
       queries,
       urls,
-      name
-    } = scrapping
-
-    console.log('Starting scrapping job:', {
-      id,
       name,
+    } = scrapping;
+
+    // 🔥 Trigger.dev cloud execution (runs once)
+    const handle = await client.trigger(scrapeEmailsTask, {
+      scrappingId: id,
+      userId: user_id,
       method,
-      queryCount: queries?.length || 0,
-      urlCount: urls?.length || 0,
-      timestamp: new Date().toISOString()
-    })
+      queries,
+      urls,
+      name,
+    });
 
-    // 🔥 Here's where you trigger your background job:
-    // Option 1: Trigger.dev integration
-    /*
-    import { client } from '@/lib/trigger'
-    await client.sendEvent({
-      name: "scrapping.job",
-      payload: { scrappingId: id, method, queries, urls }
-    })
-    */
-
-    // await client.sendEvent({
-    //   name: "scrapping.job",
-    //   payload: {
-    //     scrappingId: scrapping.id,
-    //     urls:
-    //       scrapping.method === "urls"
-    //         ? scrapping.urls
-    //         : [], // query-based handled later
-    //   },
-    // });
-
-    
-
-    // For now, just return success
     return NextResponse.json({
       success: true,
-       message: "Scrapping job sent to Trigger.dev",
+      message: "Scrapping job sent to Trigger.dev",
       scrappingId: id,
       runId: handle.id,
-    
-      timestamp: new Date().toISOString()
-    })
-    
+      timestamp: new Date().toISOString(),
+    });
+
   } catch (err) {
-    console.error('Error in start-scrapping API:', err)
+    console.error("Error in start-scrapping API:", err);
+
     return NextResponse.json(
-      { 
-        error: 'Internal server error',
-        details: process.env.NODE_ENV === 'development' ? err.message : undefined
-      },
+      { error: "Internal server error" },
       { status: 500 }
-    )
+    );
   }
 }

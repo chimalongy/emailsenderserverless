@@ -1,15 +1,7 @@
 {
-  "name": "emailsender",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
-  },
   "dependencies": {
     "@supabase/supabase-js": "^2.84.0",
-    "@trigger.dev/sdk": "^4.3.0",
+    "@trigger.dev/sdk": "4.3.0",
     "@upstash/qstash": "^2.8.4",
     "@upstash/redis": "^1.35.6",
     "axios": "^1.13.2",
@@ -26,6 +18,15 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@trigger.dev/build": "4.3.0",
     "tailwindcss": "^4"
-  }
+  },
+  "name": "emailsender",
+  "private": true,
+  "scripts": {
+    "build": "next build",
+    "dev": "next dev",
+    "start": "next start"
+  },
+  "version": "0.1.0"
 }
