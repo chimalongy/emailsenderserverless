@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { client } from "@/trigger/client";
-import { scrapeEmailsTask } from "@/trigger/scrapeEmails";
+
 
 export async function POST(req) {
   try {
@@ -23,14 +23,14 @@ export async function POST(req) {
     } = scrapping;
 
     // 🔥 Trigger.dev cloud execution (runs once)
-    const handle = await client.trigger(scrapeEmailsTask, {
-      scrappingId: id,
-      userId: user_id,
-      method,
-      queries,
-      urls,
-      name,
-    });
+    // const handle = await client.trigger(scrapeEmailsTask, {
+    //   scrappingId: id,
+    //   userId: user_id,
+    //   method,
+    //   queries,
+    //   urls,
+    //   name,
+    // });
 
     return NextResponse.json({
       success: true,
