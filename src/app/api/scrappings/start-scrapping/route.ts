@@ -1,4 +1,4 @@
-import type { scrapeEmailsTask } from "@/trigger/scrapeEmailsTask";
+import type { scrapeEmailsTask } from "../../../../trigger/scrapeEmailsTask";
 import { tasks } from "@trigger.dev/sdk";
 import { NextResponse } from "next/server";
 
