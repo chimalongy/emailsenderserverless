@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-import { readEmails } from "@/app/lib/email-reader/readEmails";
-import { readBouncedEmails } from "@/app/lib/email-reader/readBouncedEmails";
+
+import { readEmails } from "../../../lib/email-reader/readEmails";
+
+import { readBouncedEmails } from "../../../lib/email-reader/readBouncedEmails";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
