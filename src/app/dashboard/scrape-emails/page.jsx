@@ -1,18 +1,47 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { FaEnvelope, FaPlus, FaFolder, FaFileAlt, FaTrash, FaDownload, FaCalendarAlt, FaSpinner,FaSearch , FaExclamationCircle, FaSync } from 'react-icons/fa'
+import { FaEnvelope, FaPlus, FaFolder, FaFileAlt, FaTrash, FaDownload, FaCalendarAlt, FaSpinner,FaSearch , FaExclamationCircle, FaSync, FaEye } from 'react-icons/fa'
+import { useRouter } from 'next/navigation'
 import SearchModal from './components/searchmodal'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from "../../components/AuthProvider"
 
 export default function ScrapeEmailsPage() {
   const { user } = useAuth()
+  const router = useRouter()
   const [showSearchModal, setShowSearchModal] = useState(false)
   const [searches, setSearches] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [selectedSearch, setSelectedSearch] = useState(null)
+  const [emailCounts, setEmailCounts] = useState({}) // Store real email counts
+
+  // Fetch email counts for each search
+  const fetchEmailCounts = async (searchIds) => {
+    if (!searchIds.length) return
+    
+    try {
+      // Count emails in the scrappings.emails array for each search
+      const { data, error } = await supabase
+        .from('scrappings')
+        .select('id, emails')
+        .in('id', searchIds)
+      
+      if (error) {
+        console.error('Error fetching email counts:', error)
+        return
+      }
+      
+      const counts = {}
+      data.forEach(item => {
+        counts[item.id] = item.emails?.length || 0
+      })
+      setEmailCounts(counts)
+    } catch (err) {
+      console.error('Error fetching email counts:', err)
+    }
+  }
 
   // Fetch searches from database
   const fetchSearches = async () => {
@@ -39,16 +68,22 @@ export default function ScrapeEmailsPage() {
         id: search.id,
         name: search.name,
         query: search.queries?.join(', ') || 'URL list processing',
-        emailCount: search.email_count || 0,
+        emailCount: search.emails?.length || 0, // Use actual emails array length
         createdAt: new Date(search.created_at).toISOString().split('T')[0],
         updatedAt: new Date(search.updated_at).toISOString().split('T')[0],
         status: search.status || 'pending',
         method: search.method,
         queries: search.queries || [],
-        urls: search.urls || []
+        urls: search.urls || [],
+        emails: search.emails || [] // Include emails array
       }))
       
       setSearches(formattedSearches)
+      
+      // Fetch detailed email counts
+      const searchIds = formattedSearches.map(s => s.id)
+      await fetchEmailCounts(searchIds)
+      
     } catch (err) {
       console.error('Unexpected error:', err)
       setError('An unexpected error occurred')
@@ -78,9 +113,17 @@ export default function ScrapeEmailsPage() {
           table: 'scrappings',
           filter: `user_id=eq.${user.id}`
         },
-        (payload) => {
+        async (payload) => {
           // Refresh data when changes occur
-          fetchSearches()
+          await fetchSearches()
+          
+          // Update specific search's email count if it's updated
+          if (payload.eventType === 'UPDATE' && payload.new.emails) {
+            setEmailCounts(prev => ({
+              ...prev,
+              [payload.new.id]: payload.new.emails.length
+            }))
+          }
         }
       )
       .subscribe()
@@ -90,19 +133,63 @@ export default function ScrapeEmailsPage() {
     }
   }, [user])
 
+  // Poll for updates on processing searches
+  useEffect(() => {
+    if (!user) return
+    
+    const processingSearches = searches.filter(s => 
+      s.status === 'processing' || s.status === 'pending'
+    )
+    
+    if (processingSearches.length === 0) return
+    
+    const interval = setInterval(async () => {
+      const searchIds = processingSearches.map(s => s.id)
+      
+      const { data, error } = await supabase
+        .from('scrappings')
+        .select('id, status, emails, emails_found')
+        .in('id', searchIds)
+      
+      if (!error && data) {
+        // Update counts for processing searches
+        const newCounts = { ...emailCounts }
+        const updatedSearches = searches.map(search => {
+          const updated = data.find(s => s.id === search.id)
+          if (updated) {
+            newCounts[search.id] = updated.emails?.length || 0
+            
+            return {
+              ...search,
+              status: updated.status,
+              emailCount: updated.emails?.length || 0
+            }
+          }
+          return search
+        })
+        
+        setEmailCounts(newCounts)
+        setSearches(updatedSearches)
+      }
+    }, 5000) // Poll every 5 seconds for updates
+
+    return () => clearInterval(interval)
+  }, [searches, user])
+
   const handleNewSearch = (newSearch) => {
     // Add the new search to the beginning of the list
     const formattedSearch = {
       id: newSearch.id,
       name: newSearch.name,
       query: newSearch.queries?.join(', ') || 'URL list processing',
-      emailCount: newSearch.email_count || 0,
+      emailCount: newSearch.emails?.length || 0,
       createdAt: new Date(newSearch.created_at).toISOString().split('T')[0],
       updatedAt: new Date(newSearch.updated_at).toISOString().split('T')[0],
       status: newSearch.status || 'pending',
       method: newSearch.method,
       queries: newSearch.queries || [],
-      urls: newSearch.urls || []
+      urls: newSearch.urls || [],
+      emails: newSearch.emails || []
     }
     
     setSearches(prev => [formattedSearch, ...prev])
@@ -129,6 +216,11 @@ export default function ScrapeEmailsPage() {
       
       // Remove from local state
       setSearches(searches.filter(search => search.id !== id))
+      setEmailCounts(prev => {
+        const newCounts = { ...prev }
+        delete newCounts[id]
+        return newCounts
+      })
       if (selectedSearch === id) {
         setSelectedSearch(null)
       }
@@ -147,40 +239,39 @@ export default function ScrapeEmailsPage() {
     }
     
     try {
-      // First, fetch the emails for this search
-      const { data: emails, error } = await supabase
-        .from('emails') // Assuming you have an emails table
-        .select('*')
-        .eq('scrapping_id', search.id)
-        .order('created_at', { ascending: true })
-      
-      if (error) {
-        console.error('Error fetching emails:', error)
-        alert('Failed to fetch emails for download.')
-        return
-      }
+      // Get emails directly from the search's emails array
+      const emails = search.emails || []
       
       if (!emails || emails.length === 0) {
         alert('No emails found for this search.')
         return
       }
       
+      // Parse emails if they're stored as strings (might be JSON strings)
+      let parsedEmails = emails
+      if (typeof emails[0] === 'string' && emails[0].startsWith('{')) {
+        parsedEmails = emails.map(emailStr => JSON.parse(emailStr))
+      }
+      
       // Create CSV content
       const headers = ['Email', 'Source', 'Website', 'Name', 'Company', 'Title', 'Location', 'Found At']
-      const csvRows = emails.map(email => [
-        email.email || '',
-        email.source || '',
-        email.website || '',
-        email.name || '',
-        email.company || '',
-        email.title || '',
-        email.location || '',
-        email.created_at ? new Date(email.created_at).toLocaleString() : ''
-      ])
+      const csvRows = parsedEmails.map(email => {
+        const emailData = typeof email === 'string' ? { email } : email
+        return [
+          emailData.email || '',
+          emailData.source || '',
+          emailData.website || '',
+          emailData.name || '',
+          emailData.company || '',
+          emailData.title || '',
+          emailData.location || '',
+          emailData.foundAt || emailData.created_at || new Date().toLocaleString()
+        ]
+      })
       
       const csvContent = [
         headers.join(','),
-        ...csvRows.map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(','))
+        ...csvRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
       ].join('\n')
       
       // Create and trigger download
@@ -200,8 +291,18 @@ export default function ScrapeEmailsPage() {
     }
   }
 
+  const handleViewDetails = (searchId, e) => {
+    e?.stopPropagation()
+    router.push(`/dashboard/scrape-emails/${searchId}`)
+  }
+
   const handleRetryFetch = () => {
     fetchSearches()
+  }
+
+  // Function to get real-time email count for a search
+  const getRealEmailCount = (search) => {
+    return emailCounts[search.id] || search.emailCount || 0
   }
 
   if (loading && searches.length === 0) {
@@ -277,7 +378,7 @@ export default function ScrapeEmailsPage() {
               </div>
             </div>
           </div>
-          <div className="bg-white p-4 rounded-lg border border-gray-200">
+          {/* <div className="bg-white p-4 rounded-lg border border-gray-200">
             <div className="flex items-center">
               <div className="p-2 bg-blue-100 rounded-lg mr-3">
                 <FaEnvelope className="h-5 w-5 text-blue-600" />
@@ -285,11 +386,11 @@ export default function ScrapeEmailsPage() {
               <div>
                 <p className="text-xs text-gray-600">Total Emails</p>
                 <p className="text-xl font-bold text-gray-900">
-                  {searches.reduce((acc, search) => acc + (search.emailCount || 0), 0).toLocaleString()}
+                  {searches.reduce((acc, search) => acc + getRealEmailCount(search), 0).toLocaleString()}
                 </p>
               </div>
             </div>
-          </div>
+          </div> */}
           <div className="bg-white p-4 rounded-lg border border-gray-200">
             <div className="flex items-center">
               <div className="p-2 bg-green-100 rounded-lg mr-3">
@@ -345,116 +446,132 @@ export default function ScrapeEmailsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {searches.map((search) => (
-                <div
-                  key={search.id}
-                  onClick={() => setSelectedSearch(selectedSearch === search.id ? null : search.id)}
-                  className={`bg-white rounded-lg border cursor-pointer transition-all duration-200 hover:shadow ${
-                    selectedSearch === search.id ? 'border-teal-500 shadow' : 'border-gray-200 hover:border-teal-200'
-                  }`}
-                >
-                  <div className="p-4">
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex items-start">
-                        <div className={`p-2 rounded-md mr-3 mt-1 ${
-                          search.status === 'completed' ? 'bg-green-100' : 
-                          search.status === 'failed' ? 'bg-red-100' : 'bg-amber-100'
-                        }`}>
-                          {search.status === 'completed' ? (
-                            <FaFolder className="h-5 w-5 text-green-600" />
-                          ) : search.status === 'failed' ? (
-                            <FaExclamationCircle className="h-5 w-5 text-red-600" />
-                          ) : (
-                            <FaCalendarAlt className="h-5 w-5 text-amber-600" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-gray-900 text-sm truncate">{search.name}</h3>
-                          <p className="text-xs text-gray-500 truncate">
-                            {search.method === 'query' ? (
-                              <span className="flex items-center">
-                                <FaSearch className="mr-1 h-3 w-3" />
-                                {search.queries?.length || 0} queries
-                              </span>
+              {searches.map((search) => {
+                const realEmailCount = getRealEmailCount(search)
+                const isProcessing = search.status === 'processing' || search.status === 'pending'
+                
+                return (
+                  <div
+                    key={search.id}
+                    onClick={() => setSelectedSearch(selectedSearch === search.id ? null : search.id)}
+                    className={`bg-white rounded-lg border cursor-pointer transition-all duration-200 hover:shadow ${
+                      selectedSearch === search.id ? 'border-teal-500 shadow' : 'border-gray-200 hover:border-teal-200'
+                    }`}
+                  >
+                    <div className="p-4">
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex items-start">
+                          <div className={`p-2 rounded-md mr-3 mt-1 ${
+                            search.status === 'completed' ? 'bg-green-100' : 
+                            search.status === 'failed' ? 'bg-red-100' : 'bg-amber-100'
+                          }`}>
+                            {search.status === 'completed' ? (
+                              <FaFolder className="h-5 w-5 text-green-600" />
+                            ) : search.status === 'failed' ? (
+                              <FaExclamationCircle className="h-5 w-5 text-red-600" />
                             ) : (
-                              <span className="flex items-center">
-                                <FaEnvelope className="mr-1 h-3 w-3" />
-                                {search.urls?.length || 0} URLs
-                              </span>
+                              <FaCalendarAlt className="h-5 w-5 text-amber-600" />
                             )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-gray-900 text-sm truncate">{search.name}</h3>
+                            <p className="text-xs text-gray-500 truncate">
+                              {search.method === 'query' ? (
+                                <span className="flex items-center">
+                                  <FaSearch className="mr-1 h-3 w-3" />
+                                  {search.queries?.length || 0} queries
+                                </span>
+                              ) : (
+                                <span className="flex items-center">
+                                  <FaEnvelope className="mr-1 h-3 w-3" />
+                                  {search.urls?.length || 0} URLs
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => handleDeleteSearch(search.id, e)}
+                          className="text-gray-400 hover:text-red-500 p-1 ml-1"
+                          disabled={loading}
+                        >
+                          <FaTrash className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="flex items-center text-gray-600">
+                            <FaEnvelope className="mr-1.5 h-3.5 w-3.5" />
+                            Emails Found
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="font-medium">{realEmailCount.toLocaleString()}</span>
+                            {isProcessing && (
+                              <div className="relative">
+                                <div className="w-2 h-2 bg-green-500 rounded-full animate-ping"></div>
+                                <div className="absolute top-0 left-0 w-2 h-2 bg-green-500 rounded-full"></div>
+                              </div>
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="flex items-center text-gray-600">
+                            <FaCalendarAlt className="mr-1.5 h-3.5 w-3.5" />
+                            Created
+                          </span>
+                          <span>{search.createdAt}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-600">Status</span>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                            search.status === 'completed' 
+                              ? 'bg-green-100 text-green-800' 
+                              : search.status === 'failed'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {search.status.charAt(0).toUpperCase() + search.status.slice(1)}
+                            {isProcessing && '...'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {selectedSearch === search.id && (
+                        <div className="mt-3 pt-3 border-t border-gray-200">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={(e) => handleDownload(search, e)}
+                              disabled={search.status !== 'completed'}
+                              className={`flex-1 px-3 py-1.5 rounded-lg flex items-center justify-center text-sm ${
+                                search.status === 'completed'
+                                  ? 'bg-teal-600 text-white hover:bg-teal-700'
+                                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                              }`}
+                            >
+                              <FaDownload className="mr-1.5" />
+                              Download CSV ({realEmailCount})
+                            </button>
+                            <button
+                              onClick={(e) => handleViewDetails(search.id, e)}
+                              className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm flex items-center justify-center"
+                            >
+                              <FaEye className="mr-1.5" />
+                              View
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-2">
+                            Created on {search.createdAt}. 
+                            {search.method === 'query' && ` ${search.queries?.length || 0} search queries.`}
+                            {search.method === 'urls' && ` ${search.urls?.length || 0} URLs to process.`}
+                            {isProcessing && ' Emails are being collected in real-time...'}
                           </p>
                         </div>
-                      </div>
-                      <button
-                        onClick={(e) => handleDeleteSearch(search.id, e)}
-                        className="text-gray-400 hover:text-red-500 p-1 ml-1"
-                        disabled={loading}
-                      >
-                        <FaTrash className="h-3.5 w-3.5" />
-                      </button>
+                      )}
                     </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="flex items-center text-gray-600">
-                          <FaEnvelope className="mr-1.5 h-3.5 w-3.5" />
-                          Emails Found
-                        </span>
-                        <span className="font-medium">{(search.emailCount || 0).toLocaleString()}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="flex items-center text-gray-600">
-                          <FaCalendarAlt className="mr-1.5 h-3.5 w-3.5" />
-                          Created
-                        </span>
-                        <span>{search.createdAt}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-gray-600">Status</span>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                          search.status === 'completed' 
-                            ? 'bg-green-100 text-green-800' 
-                            : search.status === 'failed'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-amber-100 text-amber-800'
-                        }`}>
-                          {search.status.charAt(0).toUpperCase() + search.status.slice(1)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {selectedSearch === search.id && (
-                      <div className="mt-3 pt-3 border-t border-gray-200">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={(e) => handleDownload(search, e)}
-                            disabled={search.status !== 'completed'}
-                            className={`flex-1 px-3 py-1.5 rounded-lg flex items-center justify-center text-sm ${
-                              search.status === 'completed'
-                                ? 'bg-teal-600 text-white hover:bg-teal-700'
-                                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                            }`}
-                          >
-                            <FaDownload className="mr-1.5" />
-                            Download CSV
-                          </button>
-                          <button
-                            onClick={() => alert(`Viewing details for ${search.name}`)}
-                            className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
-                          >
-                            Details
-                          </button>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-2">
-                          Created on {search.createdAt}. 
-                          {search.method === 'query' && ` ${search.queries?.length || 0} search queries.`}
-                          {search.method === 'urls' && ` ${search.urls?.length || 0} URLs to process.`}
-                        </p>
-                      </div>
-                    )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
