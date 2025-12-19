@@ -282,30 +282,7 @@ law firms boston"
                   </p>
                 </div>
 
-                <div className="bg-gradient-to-r from-blue-50 to-teal-50 p-4 rounded-lg border border-blue-100">
-                  <h4 className="text-sm font-semibold text-blue-800 mb-2 flex items-center gap-2">
-                    <FaSearch className="h-4 w-4" />
-                    Query Format Tips
-                  </h4>
-                  <ul className="text-sm text-blue-700 space-y-2">
-                    <li className="flex items-start gap-2">
-                      <span className="bg-blue-100 text-blue-800 rounded-full h-5 w-5 flex items-center justify-center text-xs mt-0.5">1</span>
-                      <span><strong>One query per line</strong> - Each line is processed separately</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="bg-blue-100 text-blue-800 rounded-full h-5 w-5 flex items-center justify-center text-xs mt-0.5">2</span>
-                      <span><strong>Include location</strong> - "plumbers in san diego"</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="bg-blue-100 text-blue-800 rounded-full h-5 w-5 flex items-center justify-center text-xs mt-0.5">3</span>
-                      <span><strong>Be specific</strong> - "b2b saas companies remote"</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="bg-blue-100 text-blue-800 rounded-full h-5 w-5 flex items-center justify-center text-xs mt-0.5">4</span>
-                      <span><strong>Use keywords</strong> - "founder ceo startup"</span>
-                    </li>
-                  </ul>
-                </div>
+               
               </div>
             )}
 
@@ -339,30 +316,7 @@ https://consultingfirm.net"
                   </p>
                 </div>
 
-                <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-lg border border-purple-100">
-                  <h4 className="text-sm font-semibold text-purple-800 mb-2 flex items-center gap-2">
-                    <FaLink className="h-4 w-4" />
-                    URL Format Tips
-                  </h4>
-                  <ul className="text-sm text-purple-700 space-y-2">
-                    <li className="flex items-start gap-2">
-                      <span className="bg-purple-100 text-purple-800 rounded-full h-5 w-5 flex items-center justify-center text-xs mt-0.5">✓</span>
-                      <span><strong>One URL per line</strong> - Include protocol (https://)</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="bg-purple-100 text-purple-800 rounded-full h-5 w-5 flex items-center justify-center text-xs mt-0.5">✓</span>
-                      <span><strong>Valid format</strong> - https://example.com or http://site.org</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="bg-purple-100 text-purple-800 rounded-full h-5 w-5 flex items-center justify-center text-xs mt-0.5">✓</span>
-                      <span><strong>Publicly accessible</strong> - Ensure sites aren't behind login</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="bg-purple-100 text-purple-800 rounded-full h-5 w-5 flex items-center justify-center text-xs mt-0.5">✓</span>
-                      <span><strong>Business websites</strong> - We'll crawl for contact emails</span>
-                    </li>
-                  </ul>
-                </div>
+             
               </div>
             )}
 

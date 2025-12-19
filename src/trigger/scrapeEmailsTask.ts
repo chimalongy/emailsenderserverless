@@ -22,7 +22,7 @@ async function fetchWithTimeout(
     return await fetch(url, options);
   } finally {
     clearTimeout(timeoutId);
-  }
+  } 
 }
 
 /* ----------------------------------

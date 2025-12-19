@@ -1,9 +1,16 @@
 import type { scrapeEmailsTask } from "../../../../trigger/scrapeEmailsTask";
+import { configure } from "@trigger.dev/sdk";
 import { tasks } from "@trigger.dev/sdk";
 import { NextResponse } from "next/server";
 
 // Optional: enable edge runtime
 // export const runtime = "edge";
+
+configure({
+  secretKey: process.env.TRIGGER_SECRET_KEY, // WARNING: Never actually hardcode your secret key like this
+  
+});
+
 
 export async function POST(req: Request) {
   try {
@@ -30,6 +37,7 @@ export async function POST(req: Request) {
       userId: user_id,
       urls,
     };
+    console.log(JSON.stringify(payload))
 
     // ✅ Trigger the task with type-safe payload
     const handle = await tasks.trigger<typeof scrapeEmailsTask>(
