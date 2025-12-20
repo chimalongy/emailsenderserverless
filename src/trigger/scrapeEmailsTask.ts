@@ -5,7 +5,7 @@ import fetch, { RequestInit, Response } from "node-fetch";
 import * as cheerio from "cheerio";
 
 /* ----------------------------------
-   Fetch with timeout (ES5 safe)
+   Fetch with timeout
 ----------------------------------- */
 async function fetchWithTimeout(
   url: string,
@@ -18,11 +18,32 @@ async function fetchWithTimeout(
     const options: RequestInit = {
       signal: controller.signal,
       redirect: "follow",
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        Accept: "text/html",
+      },
     };
+
     return await fetch(url, options);
   } finally {
     clearTimeout(timeoutId);
-  } 
+  }
+}
+
+/* ----------------------------------
+   URL helpers
+----------------------------------- */
+function stripWWW(url: string): string {
+  try {
+    const u = new URL(url);
+    if (u.hostname.startsWith("www.")) {
+      u.hostname = u.hostname.replace(/^www\./, "");
+    }
+    return u.toString();
+  } catch {
+    return url;
+  }
 }
 
 /* ----------------------------------
@@ -32,16 +53,7 @@ const emailRegex =
   /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
 
 function extractEmails(html: string): string[] {
-  const matches = html.match(emailRegex) ?? [];
-  const unique: string[] = [];
-
-  for (let i = 0; i < matches.length; i++) {
-    if (!unique.includes(matches[i])) {
-      unique.push(matches[i]);
-    }
-  }
-
-  return unique;
+  return Array.from(new Set(html.match(emailRegex) ?? []));
 }
 
 function extractRelevantLinks(html: string, baseUrl: string): string[] {
@@ -52,17 +64,12 @@ function extractRelevantLinks(html: string, baseUrl: string): string[] {
     const href = $(el).attr("href");
     if (!href) return;
 
-    const lowerHref = href.toLowerCase();
-
-    if (lowerHref.includes("contact") || lowerHref.includes("about")) {
+    const lower = href.toLowerCase();
+    if (lower.includes("contact") || lower.includes("about")) {
       try {
-        const absoluteUrl = new URL(href, baseUrl).toString();
-        if (!links.includes(absoluteUrl)) {
-          links.push(absoluteUrl);
-        }
-      } catch {
-        // ignore invalid urls
-      }
+        const absolute = new URL(href, baseUrl).toString();
+        if (!links.includes(absolute)) links.push(absolute);
+      } catch {}
     }
   });
 
@@ -80,6 +87,11 @@ const payloadSchema = z.object({
 
 type ScrapePayload = z.infer<typeof payloadSchema>;
 
+type ScrapeResult = {
+  link_scraped: string;
+  emails: string[];
+};
+
 /* ----------------------------------
    Trigger.dev Task
 ----------------------------------- */
@@ -90,13 +102,10 @@ export const scrapeEmailsTask = task({
     const { scrappingId, urls } = payloadSchema.parse(payload);
 
     const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL as string,
-      process.env.SUPABASE_SERVICE_ROLE_KEY as string
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    /* ----------------------------------
-       Mark scrapping as started
-    ----------------------------------- */
     await supabase
       .from("scrappings")
       .update({
@@ -106,69 +115,114 @@ export const scrapeEmailsTask = task({
       })
       .eq("id", scrappingId);
 
-    const allEmails: string[] = [];
-
-    const addEmail = (email: string) => {
-      if (!allEmails.includes(email)) {
-        allEmails.push(email);
-      }
-    };
+    const results: ScrapeResult[] = [];
 
     try {
-      for (let i = 0; i < urls.length; i++) {
-        const url = urls[i];
+      for (const originalUrl of urls) {
+        const emails: string[] = [];
+        const addEmail = (email: string) => {
+          if (!emails.includes(email)) emails.push(email);
+        };
 
-        // 1️⃣ Fetch homepage
-        const homeResponse = await fetchWithTimeout(url);
-        const homeHtml = await homeResponse.text();
+        let homeHtml = "";
+        let finalUrl = originalUrl;
 
-        const homeEmails = extractEmails(homeHtml);
-        for (let e = 0; e < homeEmails.length; e++) {
-          addEmail(homeEmails[e]);
+        /* ---------- Homepage fetch ---------- */
+        try {
+          try {
+            const res = await fetchWithTimeout(originalUrl);
+            homeHtml = await res.text();
+          } catch (err: any) {
+            // Retry without www for SSL or DNS issues
+            if (
+              originalUrl.includes("www.") &&
+              (err.message?.includes("certificate") ||
+                err.code === "ENOTFOUND")
+            ) {
+              finalUrl = stripWWW(originalUrl);
+              const res = await fetchWithTimeout(finalUrl);
+              homeHtml = await res.text();
+            } else {
+              throw err;
+            }
+          }
+        } catch (err: any) {
+          // ❗ NON-FATAL ERRORS → SKIP
+          if (
+            err.name === "AbortError" ||
+            err.code === "ENOTFOUND" ||
+            err.code === "EAI_AGAIN" ||
+            err.code === "ECONNREFUSED" ||
+            err.code === "ECONNRESET"
+          ) {
+            results.push({ link_scraped: originalUrl, emails: [] });
+            continue;
+          }
+
+          throw err;
         }
 
-        // 2️⃣ Extract contact/about links
-        const subLinks = extractRelevantLinks(homeHtml, url);
+        extractEmails(homeHtml).forEach(addEmail);
 
-        // 3️⃣ Visit contact/about pages
-        for (let j = 0; j < subLinks.length; j++) {
+        /* ---------- Contact/About pages ---------- */
+        const subLinks = extractRelevantLinks(homeHtml, finalUrl);
+
+        for (const link of subLinks) {
           try {
-            const pageResponse = await fetchWithTimeout(subLinks[j]);
-            const pageHtml = await pageResponse.text();
+            let html = "";
 
-            const pageEmails = extractEmails(pageHtml);
-            for (let k = 0; k < pageEmails.length; k++) {
-              addEmail(pageEmails[k]);
+            try {
+              const res = await fetchWithTimeout(link);
+              html = await res.text();
+            } catch (err: any) {
+              if (
+                link.includes("www.") &&
+                (err.message?.includes("certificate") ||
+                  err.code === "ENOTFOUND")
+              ) {
+                const fallback = stripWWW(link);
+                const res = await fetchWithTimeout(fallback);
+                html = await res.text();
+              } else {
+                throw err;
+              }
             }
-          } catch {
-            // ignore page errors
+
+            extractEmails(html).forEach(addEmail);
+          } catch (err: any) {
+            // Ignore subpage failures
+            if (
+              err.name === "AbortError" ||
+              err.code === "ENOTFOUND" ||
+              err.code === "EAI_AGAIN"
+            ) {
+              continue;
+            }
           }
         }
+
+        results.push({
+          link_scraped: originalUrl,
+          emails,
+        });
       }
 
-      /* ----------------------------------
-         Mark scrapping as completed
-      ----------------------------------- */
       await supabase
         .from("scrappings")
         .update({
           status: "completed",
-          emails_found: allEmails.length,
-          emails: allEmails, // text[]
+          emails_found: results.reduce(
+            (sum, r) => sum + r.emails.length,
+            0
+          ),
+          emails: results,
           completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq("id", scrappingId);
 
-      return {
-        success: true,
-        emailsFound: allEmails.length,
-        emails: allEmails,
-      };
+      return { success: true, results };
     } catch (error) {
-      /* ----------------------------------
-         Mark scrapping as failed
-      ----------------------------------- */
       await supabase
         .from("scrappings")
         .update({

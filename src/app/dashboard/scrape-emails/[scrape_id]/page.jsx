@@ -1,5 +1,5 @@
 'use client'
-
+import React from 'react';
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
@@ -29,7 +29,10 @@ import {
   FaExclamationTriangle,
   FaChevronDown,
   FaChevronUp,
-  FaListAlt
+  FaListAlt,
+  FaChevronRight,
+  FaEye,
+  FaEyeSlash
 } from 'react-icons/fa'
 import Link from 'next/link'
 
@@ -41,29 +44,14 @@ export default function ScrapeDetailsPage() {
   
   const [search, setSearch] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [emails, setEmails] = useState([])
-  const [filteredEmails, setFilteredEmails] = useState([])
-  const [selectedEmails, setSelectedEmails] = useState(new Set())
-  const [isSelectAll, setIsSelectAll] = useState(false)
-  const [isEditing, setIsEditing] = useState(false)
-  const [editingEmail, setEditingEmail] = useState(null)
-  const [newEmail, setNewEmail] = useState({
-    email: '',
-    name: '',
-    company: '',
-    title: '',
-    location: '',
-    website: '',
-    source: ''
-  })
-  const [isAddingNew, setIsAddingNew] = useState(false)
+  const [scrapedData, setScrapedData] = useState([]) // Original data with link_scraped structure
+  const [filteredData, setFilteredData] = useState([])
+  const [expandedSources, setExpandedSources] = useState(new Set())
+  const [isAddingEmail, setIsAddingEmail] = useState(null) // Which source is being added to
+  const [newEmail, setNewEmail] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
-  const [sortBy, setSortBy] = useState('created_at')
-  const [sortOrder, setSortOrder] = useState('desc')
   const [isSaving, setIsSaving] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
-  const [showConfirmDelete, setShowConfirmDelete] = useState(false)
-  const [emailsToDelete, setEmailsToDelete] = useState([])
   const [showUrls, setShowUrls] = useState(false)
 
   // Fetch search details and emails
@@ -92,28 +80,15 @@ export default function ScrapeDetailsPage() {
       if (data) {
         setSearch(data)
         
-        // Parse emails from the emails array
+        // Handle the new data structure
         if (data.emails && data.emails.length > 0) {
-          const parsedEmails = data.emails.map((email, index) => {
-            let parsedEmail
-            if (typeof email === 'string') {
-              try {
-                parsedEmail = JSON.parse(email)
-              } catch {
-                parsedEmail = { email }
-              }
-            } else {
-              parsedEmail = email
-            }
-            return {
-              id: `${data.id}-${index}`, // Create unique ID
-              ...parsedEmail,
-              created_at: parsedEmail.created_at || data.created_at,
-              source: parsedEmail.source || data.method || 'scrape'
-            }
-          })
-          setEmails(parsedEmails)
-          setFilteredEmails(parsedEmails)
+          // Process data to ensure unique keys
+          const processedData = processScrapedData(data.emails)
+          setScrapedData(processedData)
+          setFilteredData(processedData)
+        } else {
+          setScrapedData([])
+          setFilteredData([])
         }
       }
     } catch (error) {
@@ -123,6 +98,34 @@ export default function ScrapeDetailsPage() {
       setLoading(false)
     }
   }, [user, id])
+
+  // Helper function to process scraped data and ensure unique keys
+  const processScrapedData = (data) => {
+    if (!data || !Array.isArray(data)) return []
+    
+    const urlCount = {}
+    const processed = []
+    
+    data.forEach((item, index) => {
+      if (item && item.link_scraped) {
+        // Count occurrences of each URL
+        urlCount[item.link_scraped] = (urlCount[item.link_scraped] || 0) + 1
+        
+        // Create a unique ID for each item
+        const uniqueId = urlCount[item.link_scraped] > 1 
+          ? `${item.link_scraped}-${urlCount[item.link_scraped]}` 
+          : item.link_scraped
+        
+        processed.push({
+          ...item,
+          uniqueId, // Add a unique identifier
+          originalIndex: index
+        })
+      }
+    })
+    
+    return processed
+  }
 
   // Initial fetch
   useEffect(() => {
@@ -155,189 +158,92 @@ export default function ScrapeDetailsPage() {
     }
   }, [user, id, fetchSearchDetails])
 
-  // Filter emails based on search term
+  // Filter sources based on search term
   useEffect(() => {
     if (!searchTerm.trim()) {
-      setFilteredEmails(emails)
+      setFilteredData(scrapedData)
       return
     }
     
     const term = searchTerm.toLowerCase()
-    const filtered = emails.filter(email => 
-      email.email?.toLowerCase().includes(term) ||
-      email.name?.toLowerCase().includes(term) ||
-      email.company?.toLowerCase().includes(term) ||
-      email.title?.toLowerCase().includes(term) ||
-      email.location?.toLowerCase().includes(term) ||
-      email.website?.toLowerCase().includes(term)
+    const filtered = scrapedData.filter(item => 
+      item.link_scraped?.toLowerCase().includes(term) ||
+      item.emails?.some(email => email.toLowerCase().includes(term))
     )
-    setFilteredEmails(filtered)
-  }, [searchTerm, emails])
+    setFilteredData(filtered)
+  }, [searchTerm, scrapedData])
 
-  // Sort emails
-  useEffect(() => {
-    const sorted = [...filteredEmails].sort((a, b) => {
-      let aValue = a[sortBy] || ''
-      let bValue = b[sortBy] || ''
-      
-      // Handle dates
-      if (sortBy === 'created_at') {
-        aValue = new Date(aValue)
-        bValue = new Date(bValue)
-      }
-      
-      if (sortOrder === 'asc') {
-        return aValue > bValue ? 1 : -1
-      } else {
-        return aValue < bValue ? 1 : -1
-      }
-    })
-    
-    setFilteredEmails(sorted)
-  }, [sortBy, sortOrder])
-
-  // Handle email selection
-  const toggleEmailSelection = (emailId) => {
-    const newSelected = new Set(selectedEmails)
-    if (newSelected.has(emailId)) {
-      newSelected.delete(emailId)
+  // Toggle source expansion
+  const toggleSourceExpansion = (uniqueId) => {
+    const newExpanded = new Set(expandedSources)
+    if (newExpanded.has(uniqueId)) {
+      newExpanded.delete(uniqueId)
+      setIsAddingEmail(null) // Close add form if open
     } else {
-      newSelected.add(emailId)
+      newExpanded.add(uniqueId)
     }
-    setSelectedEmails(newSelected)
-    setIsSelectAll(newSelected.size === filteredEmails.length)
+    setExpandedSources(newExpanded)
   }
 
-  const toggleSelectAll = () => {
-    if (isSelectAll) {
-      setSelectedEmails(new Set())
-    } else {
-      const allIds = filteredEmails.map(email => email.id)
-      setSelectedEmails(new Set(allIds))
+  // Start adding email to a source
+  const startAddEmail = (uniqueId) => {
+    setIsAddingEmail(uniqueId)
+    setNewEmail('')
+    // Expand the source if not already expanded
+    if (!expandedSources.has(uniqueId)) {
+      setExpandedSources(new Set([...expandedSources, uniqueId]))
     }
-    setIsSelectAll(!isSelectAll)
   }
 
-  // Edit email
-  const startEditEmail = (email) => {
-    setIsEditing(true)
-    setEditingEmail({ ...email })
+  // Cancel adding email
+  const cancelAddEmail = () => {
+    setIsAddingEmail(null)
+    setNewEmail('')
   }
 
-  const cancelEdit = () => {
-    setIsEditing(false)
-    setEditingEmail(null)
-  }
-
-  const saveEmailEdit = async () => {
-    if (!editingEmail || !editingEmail.email) {
+  // Save new email to source
+  const saveNewEmail = async (uniqueId) => {
+    if (!newEmail.trim()) {
       alert('Email is required')
+      return
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(newEmail)) {
+      alert('Please enter a valid email address')
       return
     }
 
     setIsSaving(true)
     try {
-      const updatedEmails = emails.map(email => 
-        email.id === editingEmail.id ? editingEmail : email
-      )
-      
-      // Update in Supabase
-      const { error } = await supabase
-        .from('scrappings')
-        .update({ 
-          emails: updatedEmails.map(e => {
-            const { id, ...rest } = e
-            return rest
-          })
-        })
-        .eq('id', search.id)
-        .eq('user_id', user.id)
-      
-      if (error) throw error
-      
-      setEmails(updatedEmails)
-      setIsEditing(false)
-      setEditingEmail(null)
-      setStatusMessage('Email updated successfully!')
-      
-      // Clear status message after 3 seconds
-      setTimeout(() => setStatusMessage(''), 3000)
-    } catch (error) {
-      console.error('Error saving email:', error)
-      alert('Failed to save changes. Please try again.')
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  // Add new email
-  const startAddNewEmail = () => {
-    setIsAddingNew(true)
-    setNewEmail({
-      email: '',
-      name: '',
-      company: '',
-      title: '',
-      location: '',
-      website: '',
-      source: 'manual'
-    })
-  }
-
-  const cancelAddNew = () => {
-    setIsAddingNew(false)
-    setNewEmail({
-      email: '',
-      name: '',
-      company: '',
-      title: '',
-      location: '',
-      website: '',
-      source: ''
-    })
-  }
-
-  const saveNewEmail = async () => {
-    if (!newEmail.email) {
-      alert('Email is required')
-      return
-    }
-
-    setIsSaving(true)
-    try {
-      const emailToAdd = {
-        ...newEmail,
-        created_at: new Date().toISOString(),
-        id: `${search.id}-${Date.now()}` // Temporary ID
-      }
-      
-      const updatedEmails = [...emails, emailToAdd]
-      
-      // Update in Supabase
-      const { error } = await supabase
-        .from('scrappings')
-        .update({ 
-          emails: updatedEmails.map(e => {
-            const { id, ...rest } = e
-            return rest
-          })
-        })
-        .eq('id', search.id)
-        .eq('user_id', user.id)
-      
-      if (error) throw error
-      
-      setEmails(updatedEmails)
-      setIsAddingNew(false)
-      setNewEmail({
-        email: '',
-        name: '',
-        company: '',
-        title: '',
-        location: '',
-        website: '',
-        source: ''
+      // Find the source in scrapedData by uniqueId
+      const updatedData = scrapedData.map(item => {
+        if (item.uniqueId === uniqueId) {
+          return {
+            ...item,
+            emails: [...(item.emails || []), newEmail.trim()]
+          }
+        }
+        return item
       })
+      
+      // Update in Supabase - reconstruct original structure without uniqueId
+      const dataForSupabase = updatedData.map(({ uniqueId, originalIndex, ...rest }) => rest)
+      
+      const { error } = await supabase
+        .from('scrappings')
+        .update({ 
+          emails: dataForSupabase
+        })
+        .eq('id', search.id)
+        .eq('user_id', user.id)
+      
+      if (error) throw error
+      
+      setScrapedData(updatedData)
+      setIsAddingEmail(null)
+      setNewEmail('')
       setStatusMessage('Email added successfully!')
       
       setTimeout(() => setStatusMessage(''), 3000)
@@ -349,47 +255,82 @@ export default function ScrapeDetailsPage() {
     }
   }
 
-  // Delete emails
-  const confirmDeleteSelected = () => {
-    if (selectedEmails.size === 0) {
-      alert('Please select emails to delete')
-      return
-    }
-    setEmailsToDelete(Array.from(selectedEmails))
-    setShowConfirmDelete(true)
-  }
-
-  const deleteEmails = async () => {
+  // Delete email from source
+  const deleteEmail = async (uniqueId, emailToDelete) => {
+    if (!confirm(`Are you sure you want to delete email: ${emailToDelete}?`)) return
+    
     setIsSaving(true)
     try {
-      const updatedEmails = emails.filter(email => !emailsToDelete.includes(email.id))
+      const updatedData = scrapedData.map(item => {
+        if (item.uniqueId === uniqueId) {
+          return {
+            ...item,
+            emails: (item.emails || []).filter(email => email !== emailToDelete)
+          }
+        }
+        return item
+      })
+      
+      // Update in Supabase - reconstruct original structure without uniqueId
+      const dataForSupabase = updatedData.map(({ uniqueId, originalIndex, ...rest }) => rest)
       
       const { error } = await supabase
         .from('scrappings')
         .update({ 
-          emails: updatedEmails.map(e => {
-            const { id, ...rest } = e
-            return rest
-          })
+          emails: dataForSupabase
         })
         .eq('id', search.id)
         .eq('user_id', user.id)
       
       if (error) throw error
       
-      setEmails(updatedEmails)
-      setSelectedEmails(new Set())
-      setIsSelectAll(false)
-      setShowConfirmDelete(false)
-      setStatusMessage(`Deleted ${emailsToDelete.length} email(s) successfully!`)
+      setScrapedData(updatedData)
+      setStatusMessage('Email deleted successfully!')
       
       setTimeout(() => setStatusMessage(''), 3000)
     } catch (error) {
-      console.error('Error deleting emails:', error)
-      alert('Failed to delete emails. Please try again.')
+      console.error('Error deleting email:', error)
+      alert('Failed to delete email. Please try again.')
     } finally {
       setIsSaving(false)
-      setEmailsToDelete([])
+    }
+  }
+
+  // Delete entire source
+  const deleteSource = async (uniqueId) => {
+    if (!confirm(`Are you sure you want to delete this source and all its emails?`)) return
+    
+    setIsSaving(true)
+    try {
+      const updatedData = scrapedData.filter(item => item.uniqueId !== uniqueId)
+      
+      // Update in Supabase - reconstruct original structure without uniqueId
+      const dataForSupabase = updatedData.map(({ uniqueId, originalIndex, ...rest }) => rest)
+      
+      const { error } = await supabase
+        .from('scrappings')
+        .update({ 
+          emails: dataForSupabase
+        })
+        .eq('id', search.id)
+        .eq('user_id', user.id)
+      
+      if (error) throw error
+      
+      setScrapedData(updatedData)
+      setExpandedSources(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(uniqueId)
+        return newSet
+      })
+      setStatusMessage('Source deleted successfully!')
+      
+      setTimeout(() => setStatusMessage(''), 3000)
+    } catch (error) {
+      console.error('Error deleting source:', error)
+      alert('Failed to delete source. Please try again.')
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -402,44 +343,33 @@ export default function ScrapeDetailsPage() {
 
   // Copy all emails to clipboard
   const copyAllEmails = () => {
-    if (emails.length === 0) {
+    const allEmails = scrapedData.flatMap(item => item.emails || [])
+    if (allEmails.length === 0) {
       alert('No emails to copy')
       return
     }
     
-    const allEmails = emails.map(email => email.email).join('\n')
-    copyToClipboard(allEmails)
-  }
-
-  // Copy selected emails to clipboard
-  const copySelectedEmails = () => {
-    if (selectedEmails.size === 0) {
-      alert('Please select emails to copy')
-      return
-    }
-    
-    const selectedEmailsList = emails.filter(e => selectedEmails.has(e.id))
-    const emailList = selectedEmailsList.map(e => e.email).join('\n')
-    copyToClipboard(emailList)
+    copyToClipboard(allEmails.join('\n'))
   }
 
   // Download CSV
   const downloadCSV = () => {
-    if (emails.length === 0) {
+    const allEmails = scrapedData.flatMap(item => 
+      (item.emails || []).map(email => ({
+        email,
+        source: item.link_scraped
+      }))
+    )
+    
+    if (allEmails.length === 0) {
       alert('No emails to download')
       return
     }
 
-    const headers = ['Email', 'Name', 'Company', 'Title', 'Location', 'Website', 'Source', 'Created At']
-    const csvRows = emails.map(email => [
-      email.email || '',
-      email.name || '',
-      email.company || '',
-      email.title || '',
-      email.location || '',
-      email.website || '',
-      email.source || '',
-      email.created_at ? new Date(email.created_at).toLocaleString() : ''
+    const headers = ['Email', 'Source']
+    const csvRows = allEmails.map(({ email, source }) => [
+      email || '',
+      source || ''
     ])
     
     const csvContent = [
@@ -478,8 +408,20 @@ export default function ScrapeDetailsPage() {
 
   // Function to truncate URL for display
   const truncateUrl = (url, maxLength = 50) => {
+    if (!url) return 'N/A'
     if (url.length <= maxLength) return url
     return url.substring(0, maxLength) + '...'
+  }
+
+  // Count total emails
+  const countTotalEmails = () => {
+    if (!scrapedData || !Array.isArray(scrapedData)) return 0
+    return scrapedData.reduce((total, item) => total + (item.emails?.length || 0), 0)
+  }
+
+  // Count total sources
+  const countTotalSources = () => {
+    return scrapedData.length
   }
 
   if (loading) {
@@ -511,7 +453,7 @@ export default function ScrapeDetailsPage() {
             <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">Search Not Found</h2>
             <p className="text-gray-600 text-sm sm:text-base">{statusMessage || 'The search you are looking for does not exist or you do not have permission to view it.'}</p>
             <Link 
-               href="/dashboard/scrape-emails" 
+              href="/dashboard/scrape-emails" 
               className="inline-block mt-3 sm:mt-4 px-3 sm:px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm sm:text-base"
             >
               Go Back to Searches
@@ -529,7 +471,7 @@ export default function ScrapeDetailsPage() {
         <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
           <div className="flex-1">
             <Link 
-               href="/dashboard/scrape-emails" 
+              href="/dashboard/scrape-emails" 
               className="inline-flex items-center text-teal-600 hover:text-teal-700 text-sm sm:text-base mb-2"
             >
               <FaArrowLeft className="mr-1 sm:mr-2" />
@@ -566,15 +508,15 @@ export default function ScrapeDetailsPage() {
                 <FaEnvelope className="mr-1 sm:mr-2 h-4 w-4" />
                 <span className="text-xs sm:text-sm font-medium">Emails Found</span>
               </div>
-              <p className="text-gray-900 text-lg sm:text-xl font-semibold">{emails.length.toLocaleString()}</p>
+              <p className="text-gray-900 text-lg sm:text-xl font-semibold">{countTotalEmails().toLocaleString()}</p>
             </div>
             
             <div>
               <div className="flex items-center text-gray-600 mb-1 sm:mb-2">
-                <FaCalendarAlt className="mr-1 sm:mr-2 h-4 w-4" />
-                <span className="text-xs sm:text-sm font-medium">Created</span>
+                <FaGlobe className="mr-1 sm:mr-2 h-4 w-4" />
+                <span className="text-xs sm:text-sm font-medium">Sources</span>
               </div>
-              <p className="text-gray-900 text-xs sm:text-sm">{formatDate(search.created_at)}</p>
+              <p className="text-gray-900 text-lg sm:text-xl font-semibold">{countTotalSources().toLocaleString()}</p>
             </div>
             
             <div>
@@ -668,7 +610,7 @@ export default function ScrapeDetailsPage() {
                 <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <input
                   type="text"
-                  placeholder="Search emails..."
+                  placeholder="Search sources or emails..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 sm:focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
@@ -676,33 +618,12 @@ export default function ScrapeDetailsPage() {
               </div>
             </div>
             
-            <div className="flex items-center gap-2">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="px-2 sm:px-3 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm w-full sm:w-auto"
-              >
-                <option value="created_at">Sort by Date</option>
-                <option value="email">Sort by Email</option>
-                <option value="name">Sort by Name</option>
-                <option value="company">Sort by Company</option>
-              </select>
-              
-              <button
-                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                className="px-2 sm:px-3 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm hover:bg-gray-50 whitespace-nowrap"
-              >
-                <FaFilter className="inline mr-1 h-3 w-3" />
-                {sortOrder === 'asc' ? 'Asc' : 'Desc'}
-              </button>
-            </div>
-            
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <button
                 onClick={downloadCSV}
-                disabled={emails.length === 0}
+                disabled={countTotalEmails() === 0}
                 className={`px-3 sm:px-4 py-2 rounded-lg flex items-center justify-center text-sm ${
-                  emails.length === 0 
+                  countTotalEmails() === 0 
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
                     : 'bg-teal-600 text-white hover:bg-teal-700'
                 }`}
@@ -714,304 +635,41 @@ export default function ScrapeDetailsPage() {
               
               <button
                 onClick={copyAllEmails}
-                disabled={emails.length === 0}
+                disabled={countTotalEmails() === 0}
                 className={`px-3 sm:px-4 py-2 rounded-lg flex items-center justify-center text-sm ${
-                  emails.length === 0 
+                  countTotalEmails() === 0 
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
                     : 'bg-blue-600 text-white hover:bg-blue-700'
                 }`}
               >
                 <FaCopy className="mr-1 sm:mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Copy Emails</span>
-                <span className="sm:hidden">Copy</span>
-              </button>
-              
-              <button
-                onClick={startAddNewEmail}
-                className="px-3 sm:px-4 py-2 border border-teal-600 text-teal-600 rounded-lg hover:bg-teal-50 flex items-center justify-center text-sm"
-              >
-                <FaPlus className="mr-1 sm:mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Add Email</span>
-                <span className="sm:hidden">Add</span>
+                <span className="hidden sm:inline">Copy All Emails</span>
+                <span className="sm:hidden">Copy All</span>
               </button>
             </div>
           </div>
-          
-          {/* Selection Actions */}
-          {selectedEmails.size > 0 && (
-            <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gray-200">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                <div className="flex items-center">
-                  <button
-                    onClick={toggleSelectAll}
-                    className="flex items-center text-xs sm:text-sm text-gray-700 hover:text-gray-900 mr-3"
-                  >
-                    {isSelectAll ? (
-                      <FaCheckSquare className="mr-1 sm:mr-2 text-teal-600 h-4 w-4" />
-                    ) : (
-                      <FaSquare className="mr-1 sm:mr-2 text-gray-400 h-4 w-4" />
-                    )}
-                    {selectedEmails.size} selected
-                  </button>
-                  
-                  <button
-                    onClick={copySelectedEmails}
-                    className="px-2 sm:px-3 py-1 text-xs sm:text-sm text-gray-700 hover:text-gray-900 flex items-center"
-                  >
-                    <FaCopy className="mr-1 sm:mr-2 h-3 w-3" />
-                    Copy Selected
-                  </button>
-                </div>
-                
-                <button
-                  onClick={confirmDeleteSelected}
-                  className="px-3 sm:px-4 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center text-xs sm:text-sm whitespace-nowrap"
-                >
-                  <FaTrash className="mr-1 sm:mr-2 h-3 w-3" />
-                  Delete Selected ({selectedEmails.size})
-                </button>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Add New Email Form */}
-        {isAddingNew && (
-          <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 mb-4 sm:mb-6">
-            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Add New Email</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Email *</label>
-                <input
-                  type="email"
-                  value={newEmail.email}
-                  onChange={(e) => setNewEmail({...newEmail, email: e.target.value})}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 sm:focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                  placeholder="example@company.com"
-                />
-              </div>
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Name</label>
-                <input
-                  type="text"
-                  value={newEmail.name}
-                  onChange={(e) => setNewEmail({...newEmail, name: e.target.value})}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 sm:focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                  placeholder="John Doe"
-                />
-              </div>
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Company</label>
-                <input
-                  type="text"
-                  value={newEmail.company}
-                  onChange={(e) => setNewEmail({...newEmail, company: e.target.value})}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 sm:focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                  placeholder="Company Inc."
-                />
-              </div>
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Title</label>
-                <input
-                  type="text"
-                  value={newEmail.title}
-                  onChange={(e) => setNewEmail({...newEmail, title: e.target.value})}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 sm:focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                  placeholder="CEO"
-                />
-              </div>
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Location</label>
-                <input
-                  type="text"
-                  value={newEmail.location}
-                  onChange={(e) => setNewEmail({...newEmail, location: e.target.value})}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 sm:focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                  placeholder="New York, NY"
-                />
-              </div>
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Website</label>
-                <input
-                  type="url"
-                  value={newEmail.website}
-                  onChange={(e) => setNewEmail({...newEmail, website: e.target.value})}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 sm:focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                  placeholder="https://company.com"
-                />
-              </div>
-            </div>
-            <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
-              <button
-                onClick={cancelAddNew}
-                className="px-3 sm:px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm w-full sm:w-auto order-2 sm:order-1"
-                disabled={isSaving}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={saveNewEmail}
-                className="px-3 sm:px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 flex items-center justify-center text-sm w-full sm:w-auto order-1 sm:order-2"
-                disabled={isSaving}
-              >
-                {isSaving ? (
-                  <>
-                    <FaSpinner className="animate-spin mr-1 sm:mr-2 h-4 w-4" />
-                    <span>Saving...</span>
-                  </>
-                ) : (
-                  <>
-                    <FaSave className="mr-1 sm:mr-2 h-4 w-4" />
-                    <span>Add Email</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Edit Email Form */}
-        {isEditing && editingEmail && (
-          <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 mb-4 sm:mb-6">
-            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Edit Email</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Email *</label>
-                <input
-                  type="email"
-                  value={editingEmail.email}
-                  onChange={(e) => setEditingEmail({...editingEmail, email: e.target.value})}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 sm:focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Name</label>
-                <input
-                  type="text"
-                  value={editingEmail.name || ''}
-                  onChange={(e) => setEditingEmail({...editingEmail, name: e.target.value})}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 sm:focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Company</label>
-                <input
-                  type="text"
-                  value={editingEmail.company || ''}
-                  onChange={(e) => setEditingEmail({...editingEmail, company: e.target.value})}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 sm:focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Title</label>
-                <input
-                  type="text"
-                  value={editingEmail.title || ''}
-                  onChange={(e) => setEditingEmail({...editingEmail, title: e.target.value})}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 sm:focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Location</label>
-                <input
-                  type="text"
-                  value={editingEmail.location || ''}
-                  onChange={(e) => setEditingEmail({...editingEmail, location: e.target.value})}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 sm:focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Website</label>
-                <input
-                  type="url"
-                  value={editingEmail.website || ''}
-                  onChange={(e) => setEditingEmail({...editingEmail, website: e.target.value})}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 sm:focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                />
-              </div>
-            </div>
-            <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
-              <button
-                onClick={cancelEdit}
-                className="px-3 sm:px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm w-full sm:w-auto order-2 sm:order-1"
-                disabled={isSaving}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={saveEmailEdit}
-                className="px-3 sm:px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 flex items-center justify-center text-sm w-full sm:w-auto order-1 sm:order-2"
-                disabled={isSaving}
-              >
-                {isSaving ? (
-                  <>
-                    <FaSpinner className="animate-spin mr-1 sm:mr-2 h-4 w-4" />
-                    <span>Saving...</span>
-                  </>
-                ) : (
-                  <>
-                    <FaSave className="mr-1 sm:mr-2 h-4 w-4" />
-                    <span>Save Changes</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Emails List */}
+        {/* Sources Table */}
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          {filteredEmails.length === 0 ? (
+          {filteredData.length === 0 ? (
             <div className="text-center py-8 sm:py-12">
-              <FaEnvelope className="h-10 w-10 sm:h-12 sm:w-12 text-gray-300 mx-auto mb-3 sm:mb-4" />
-              <h3 className="font-medium text-gray-900 mb-1 text-sm sm:text-base">No emails found</h3>
+              <FaGlobe className="h-10 w-10 sm:h-12 sm:w-12 text-gray-300 mx-auto mb-3 sm:mb-4" />
+              <h3 className="font-medium text-gray-900 mb-1 text-sm sm:text-base">No sources found</h3>
               <p className="text-gray-600 text-xs sm:text-sm mb-3 sm:mb-4">
-                {searchTerm ? 'Try a different search term' : 'Start by adding emails or wait for scraping to complete'}
+                {searchTerm ? 'Try a different search term' : 'Wait for scraping to complete or add URLs manually'}
               </p>
-              {!searchTerm && (
-                <button
-                  onClick={startAddNewEmail}
-                  className="px-3 sm:px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 inline-flex items-center text-xs sm:text-sm"
-                >
-                  <FaPlus className="mr-1 sm:mr-2" />
-                  Add Your First Email
-                </button>
-              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left">
-                      <button
-                        onClick={toggleSelectAll}
-                        className="flex items-center focus:outline-none"
-                      >
-                        {isSelectAll ? (
-                          <FaCheckSquare className="text-teal-600 h-4 w-4" />
-                        ) : (
-                          <FaSquare className="text-gray-400 h-4 w-4" />
-                        )}
-                      </button>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Source URL
                     </th>
                     <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Email
-                    </th>
-                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
-                      Name
-                    </th>
-                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
-                      Company
-                    </th>
-                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
-                      Title
-                    </th>
-                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden xl:table-cell">
-                      Location
-                    </th>
-                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Source
+                      Emails
                     </th>
                     <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
@@ -1019,206 +677,214 @@ export default function ScrapeDetailsPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredEmails.map((email) => (
-                    <tr 
-                      key={email.id}
-                      className={`hover:bg-gray-50 ${
-                        selectedEmails.has(email.id) ? 'bg-blue-50' : ''
-                      }`}
-                    >
-                      <td className="px-3 sm:px-6 py-3 whitespace-nowrap">
-                        <button
-                          onClick={() => toggleEmailSelection(email.id)}
-                          className="flex items-center focus:outline-none"
-                        >
-                          {selectedEmails.has(email.id) ? (
-                            <FaCheckSquare className="text-teal-600 h-4 w-4" />
-                          ) : (
-                            <FaSquare className="text-gray-400 hover:text-gray-600 h-4 w-4" />
-                          )}
-                        </button>
-                      </td>
-                      <td className="px-3 sm:px-6 py-3">
-                        <div className="flex items-center">
-                          <FaEnvelope className="mr-2 text-gray-400 flex-shrink-0 h-4 w-4" />
-                          <div className="min-w-0">
-                            <div className="text-sm font-medium text-gray-900 truncate max-w-[150px] sm:max-w-none" title={email.email}>
-                              {email.email}
+                  {filteredData.map((item) => {
+                    const isExpanded = expandedSources.has(item.uniqueId)
+                    const hasEmails = item.emails && item.emails.length > 0
+                    const emailCount = item.emails?.length || 0
+                    
+                    return (
+                      <React.Fragment key={item.uniqueId}>
+                        <tr className="hover:bg-gray-50">
+                          <td className="px-3 sm:px-6 py-3">
+                            <div className="flex items-center">
+                              <button
+                                onClick={() => toggleSourceExpansion(item.uniqueId)}
+                                className="mr-2 text-gray-400 hover:text-gray-600"
+                              >
+                                {isExpanded ? (
+                                  <FaChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <FaChevronRight className="h-4 w-4" />
+                                )}
+                              </button>
+                              <div className="min-w-0">
+                                <a 
+                                  href={item.link_scraped} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-sm font-medium text-teal-600 hover:text-teal-800 truncate block max-w-[200px] sm:max-w-[300px]"
+                                  title={item.link_scraped}
+                                >
+                                  {truncateUrl(item.link_scraped, 40)}
+                                </a>
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {emailCount} email{emailCount !== 1 ? 's' : ''}
+                                </div>
+                              </div>
                             </div>
-                            {email.website && (
-                              <div className="text-xs text-gray-500 flex items-center">
-                                <FaGlobe className="mr-1 h-3 w-3 flex-shrink-0" />
-                                <span className="truncate max-w-[120px] sm:max-w-none" title={email.website}>
-                                  {email.website}
-                                </span>
+                          </td>
+                          <td className="px-3 sm:px-6 py-3">
+                            {hasEmails ? (
+                              <div className="flex items-center">
+                                <FaEnvelope className="mr-2 text-gray-400 h-4 w-4 flex-shrink-0" />
+                                <div className="min-w-0">
+                                  <div className="text-sm text-gray-900 truncate max-w-[150px] sm:max-w-[250px]">
+                                    {item.emails[0]}
+                                  </div>
+                                  {emailCount > 1 && (
+                                    <div className="text-xs text-gray-500">
+                                      +{emailCount - 1} more email{emailCount - 1 !== 1 ? 's' : ''}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center text-gray-400">
+                                <FaEnvelope className="mr-2 h-4 w-4 flex-shrink-0" />
+                                <span className="text-sm">No emails found</span>
                               </div>
                             )}
-                          </div>
-                          <button
-                            onClick={() => copyToClipboard(email.email)}
-                            className="ml-2 text-gray-400 hover:text-gray-600 flex-shrink-0"
-                            title="Copy email"
-                          >
-                            <FaCopy className="h-3 w-3 sm:h-4 sm:w-4" />
-                          </button>
-                        </div>
-                        {/* Mobile-only details */}
-                        <div className="sm:hidden mt-2 space-y-1">
-                          {email.name && (
-                            <div className="flex items-center text-xs">
-                              <FaUser className="mr-1 text-gray-400 h-3 w-3" />
-                              <span className="text-gray-700">{email.name}</span>
+                          </td>
+                          <td className="px-3 sm:px-6 py-3 whitespace-nowrap text-sm font-medium">
+                            <div className="flex items-center gap-1 sm:gap-2">
+                              <button
+                                onClick={() => startAddEmail(item.uniqueId)}
+                                className="text-teal-600 hover:text-teal-900 p-1"
+                                title="Add email"
+                              >
+                                <FaPlus className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => copyToClipboard(item.link_scraped)}
+                                className="text-blue-600 hover:text-blue-900 p-1"
+                                title="Copy URL"
+                              >
+                                <FaCopy className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => deleteSource(item.uniqueId)}
+                                className="text-red-600 hover:text-red-900 p-1"
+                                title="Delete source"
+                              >
+                                <FaTrash className="h-4 w-4" />
+                              </button>
                             </div>
-                          )}
-                          {email.company && (
-                            <div className="flex items-center text-xs">
-                              <FaBuilding className="mr-1 text-gray-400 h-3 w-3" />
-                              <span className="text-gray-700">{email.company}</span>
-                            </div>
-                          )}
-                          {email.title && (
-                            <div className="text-xs text-gray-700">Title: {email.title}</div>
-                          )}
-                          {email.location && (
-                            <div className="flex items-center text-xs">
-                              <FaMapMarkerAlt className="mr-1 text-gray-400 h-3 w-3" />
-                              <span className="text-gray-700">{email.location}</span>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 sm:px-6 py-3 whitespace-nowrap hidden sm:table-cell">
-                        {email.name ? (
-                          <div className="flex items-center">
-                            <FaUser className="mr-2 text-gray-400 h-4 w-4" />
-                            <span className="text-sm text-gray-900">{email.name}</span>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-gray-400">-</span>
+                          </td>
+                        </tr>
+                        
+                        {/* Expanded row for emails list */}
+                        {isExpanded && (
+                          <tr key={`${item.uniqueId}-expanded`} className="bg-gray-50">
+                            <td colSpan={3} className="px-3 sm:px-6 py-3">
+                              <div className="pl-8 sm:pl-10">
+                                {/* Add email form */}
+                                {isAddingEmail === item.uniqueId && (
+                                  <div className="mb-3 p-3 bg-white rounded-lg border border-gray-200">
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="email"
+                                        value={newEmail}
+                                        onChange={(e) => setNewEmail(e.target.value)}
+                                        placeholder="Enter email address"
+                                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                                        onKeyPress={(e) => e.key === 'Enter' && saveNewEmail(item.uniqueId)}
+                                      />
+                                      <button
+                                        onClick={() => saveNewEmail(item.uniqueId)}
+                                        disabled={isSaving || !newEmail.trim()}
+                                        className="px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                                      >
+                                        {isSaving ? (
+                                          <FaSpinner className="animate-spin h-4 w-4" />
+                                        ) : (
+                                          'Add'
+                                        )}
+                                      </button>
+                                      <button
+                                        onClick={cancelAddEmail}
+                                        className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {/* Emails list */}
+                                {hasEmails ? (
+                                  <div className="space-y-2">
+                                    {item.emails.map((email, index) => (
+                                      <div key={`${item.uniqueId}-email-${index}`} className="flex items-center justify-between p-2 bg-white rounded border border-gray-200">
+                                        <div className="flex items-center flex-1 min-w-0">
+                                          <FaEnvelope className="mr-2 text-gray-400 h-3 w-3 flex-shrink-0" />
+                                          <span className="text-sm text-gray-900 truncate flex-1" title={email}>
+                                            {email}
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-2 ml-2">
+                                          <button
+                                            onClick={() => copyToClipboard(email)}
+                                            className="text-blue-600 hover:text-blue-900 p-1"
+                                            title="Copy email"
+                                          >
+                                            <FaCopy className="h-3 w-3" />
+                                          </button>
+                                          <button
+                                            onClick={() => deleteEmail(item.uniqueId, email)}
+                                            className="text-red-600 hover:text-red-900 p-1"
+                                            title="Delete email"
+                                          >
+                                            <FaTrash className="h-3 w-3" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="text-center py-4">
+                                    <FaEnvelope className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                                    <p className="text-gray-500 text-sm">No emails found for this source</p>
+                                    {!isAddingEmail && (
+                                      <button
+                                        onClick={() => startAddEmail(item.uniqueId)}
+                                        className="mt-2 px-3 py-1 text-teal-600 hover:text-teal-700 text-sm"
+                                      >
+                                        + Add first email
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                                
+                                {/* Add email button when not in add mode */}
+                                {!isAddingEmail && hasEmails && (
+                                  <div className="mt-3">
+                                    <button
+                                      onClick={() => startAddEmail(item.uniqueId)}
+                                      className="flex items-center text-teal-600 hover:text-teal-700 text-sm"
+                                    >
+                                      <FaPlus className="mr-1 h-3 w-3" />
+                                      Add another email to this source
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
                         )}
-                      </td>
-                      <td className="px-3 sm:px-6 py-3 whitespace-nowrap hidden md:table-cell">
-                        {email.company ? (
-                          <div className="flex items-center">
-                            <FaBuilding className="mr-2 text-gray-400 h-4 w-4" />
-                            <span className="text-sm text-gray-900">{email.company}</span>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-3 sm:px-6 py-3 whitespace-nowrap hidden lg:table-cell">
-                        <span className="text-sm text-gray-900 truncate block max-w-[120px]" title={email.title || ''}>
-                          {email.title || '-'}
-                        </span>
-                      </td>
-                      <td className="px-3 sm:px-6 py-3 whitespace-nowrap hidden xl:table-cell">
-                        {email.location ? (
-                          <div className="flex items-center">
-                            <FaMapMarkerAlt className="mr-2 text-gray-400 h-4 w-4" />
-                            <span className="text-sm text-gray-900">{email.location}</span>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-3 sm:px-6 py-3 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs rounded-full ${
-                          email.source === 'manual' 
-                            ? 'bg-purple-100 text-purple-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {email.source || 'scrape'}
-                        </span>
-                      </td>
-                      <td className="px-3 sm:px-6 py-3 whitespace-nowrap text-sm font-medium">
-                        <div className="flex items-center gap-1 sm:gap-2">
-                          <button
-                            onClick={() => startEditEmail(email)}
-                            className="text-teal-600 hover:text-teal-900"
-                            title="Edit"
-                          >
-                            <FaEdit className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setEmailsToDelete([email.id])
-                              setShowConfirmDelete(true)
-                            }}
-                            className="text-red-600 hover:text-red-900"
-                            title="Delete"
-                          >
-                            <FaTrash className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                      </React.Fragment>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
           )}
           
           {/* Pagination Info */}
-          {filteredEmails.length > 0 && (
+          {filteredData.length > 0 && (
             <div className="px-3 sm:px-6 py-2 sm:py-3 border-t border-gray-200">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                 <div className="text-xs sm:text-sm text-gray-700">
-                  Showing <span className="font-medium">{filteredEmails.length}</span> of{' '}
-                  <span className="font-medium">{emails.length}</span> emails
+                  Showing <span className="font-medium">{filteredData.length}</span> of{' '}
+                  <span className="font-medium">{scrapedData.length}</span> sources
                 </div>
-                <div className="text-xs sm:text-sm text-gray-500">
-                  {selectedEmails.size > 0 && `${selectedEmails.size} selected`}
+                <div className="text-xs sm:text-sm text-gray-700">
+                  Total emails: <span className="font-medium">{countTotalEmails().toLocaleString()}</span>
                 </div>
               </div>
             </div>
           )}
         </div>
       </div>
-
-      {/* Delete Confirmation Modal */}
-      {showConfirmDelete && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-3 sm:p-4 z-50">
-          <div className="bg-white rounded-lg p-4 sm:p-6 max-w-md w-full mx-2">
-            <div className="flex items-center mb-3 sm:mb-4">
-              <FaExclamationTriangle className="h-5 w-5 sm:h-6 sm:w-6 text-red-600 mr-2 sm:mr-3 flex-shrink-0" />
-              <h3 className="text-base sm:text-lg font-semibold text-gray-900">Confirm Delete</h3>
-            </div>
-            <p className="text-gray-600 text-sm sm:text-base mb-4 sm:mb-6">
-              Are you sure you want to delete {emailsToDelete.length} email(s)? This action cannot be undone.
-            </p>
-            <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
-              <button
-                onClick={() => {
-                  setShowConfirmDelete(false)
-                  setEmailsToDelete([])
-                }}
-                className="px-3 sm:px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm w-full sm:w-auto order-2 sm:order-1"
-                disabled={isSaving}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={deleteEmails}
-                className="px-3 sm:px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center justify-center text-sm w-full sm:w-auto order-1 sm:order-2"
-                disabled={isSaving}
-              >
-                {isSaving ? (
-                  <>
-                    <FaSpinner className="animate-spin mr-1 sm:mr-2 h-4 w-4" />
-                    <span>Deleting...</span>
-                  </>
-                ) : (
-                  <>
-                    <FaTrash className="mr-1 sm:mr-2 h-4 w-4" />
-                    <span>Delete</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

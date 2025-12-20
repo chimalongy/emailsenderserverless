@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { FaEnvelope, FaPlus, FaFolder, FaFileAlt, FaTrash, FaDownload, FaCalendarAlt, FaSpinner,FaSearch , FaExclamationCircle, FaSync, FaEye } from 'react-icons/fa'
+import { FaEnvelope, FaPlus, FaFolder, FaFileAlt, FaTrash, FaDownload, FaCalendarAlt, FaSpinner, FaSearch, FaExclamationCircle, FaSync, FaEye } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import SearchModal from './components/searchmodal'
 import { supabase } from '../../lib/supabase'
@@ -17,12 +17,44 @@ export default function ScrapeEmailsPage() {
   const [selectedSearch, setSelectedSearch] = useState(null)
   const [emailCounts, setEmailCounts] = useState({}) // Store real email counts
 
+  // Helper function to count emails from the new structure
+  const countEmailsFromStructure = (emailsData) => {
+    if (!emailsData || !Array.isArray(emailsData)) return 0
+    
+    let total = 0
+    emailsData.forEach(item => {
+      if (item && item.emails && Array.isArray(item.emails)) {
+        total += item.emails.length
+      }
+    })
+    return total
+  }
+
+  // Helper function to extract all emails into a flat array for download
+  const extractAllEmails = (emailsData) => {
+    if (!emailsData || !Array.isArray(emailsData)) return []
+    
+    const allEmails = []
+    emailsData.forEach(item => {
+      if (item && item.emails && Array.isArray(item.emails)) {
+        item.emails.forEach(email => {
+          allEmails.push({
+            email: email,
+            source: item.link_scraped || 'Unknown',
+            website: item.link_scraped || '',
+            foundAt: new Date().toISOString()
+          })
+        })
+      }
+    })
+    return allEmails
+  }
+
   // Fetch email counts for each search
   const fetchEmailCounts = async (searchIds) => {
     if (!searchIds.length) return
     
     try {
-      // Count emails in the scrappings.emails array for each search
       const { data, error } = await supabase
         .from('scrappings')
         .select('id, emails')
@@ -35,7 +67,7 @@ export default function ScrapeEmailsPage() {
       
       const counts = {}
       data.forEach(item => {
-        counts[item.id] = item.emails?.length || 0
+        counts[item.id] = countEmailsFromStructure(item.emails)
       })
       setEmailCounts(counts)
     } catch (err) {
@@ -68,14 +100,14 @@ export default function ScrapeEmailsPage() {
         id: search.id,
         name: search.name,
         query: search.queries?.join(', ') || 'URL list processing',
-        emailCount: search.emails?.length || 0, // Use actual emails array length
+        emailCount: countEmailsFromStructure(search.emails),
         createdAt: new Date(search.created_at).toISOString().split('T')[0],
         updatedAt: new Date(search.updated_at).toISOString().split('T')[0],
         status: search.status || 'pending',
         method: search.method,
         queries: search.queries || [],
         urls: search.urls || [],
-        emails: search.emails || [] // Include emails array
+        emails: search.emails || [] // This is now the JSON array with link_scraped structure
       }))
       
       setSearches(formattedSearches)
@@ -121,7 +153,7 @@ export default function ScrapeEmailsPage() {
           if (payload.eventType === 'UPDATE' && payload.new.emails) {
             setEmailCounts(prev => ({
               ...prev,
-              [payload.new.id]: payload.new.emails.length
+              [payload.new.id]: countEmailsFromStructure(payload.new.emails)
             }))
           }
         }
@@ -157,12 +189,14 @@ export default function ScrapeEmailsPage() {
         const updatedSearches = searches.map(search => {
           const updated = data.find(s => s.id === search.id)
           if (updated) {
-            newCounts[search.id] = updated.emails?.length || 0
+            const emailCount = countEmailsFromStructure(updated.emails)
+            newCounts[search.id] = emailCount
             
             return {
               ...search,
               status: updated.status,
-              emailCount: updated.emails?.length || 0
+              emailCount: emailCount,
+              emails: updated.emails || []
             }
           }
           return search
@@ -182,7 +216,7 @@ export default function ScrapeEmailsPage() {
       id: newSearch.id,
       name: newSearch.name,
       query: newSearch.queries?.join(', ') || 'URL list processing',
-      emailCount: newSearch.emails?.length || 0,
+      emailCount: countEmailsFromStructure(newSearch.emails),
       createdAt: new Date(newSearch.created_at).toISOString().split('T')[0],
       updatedAt: new Date(newSearch.updated_at).toISOString().split('T')[0],
       status: newSearch.status || 'pending',
@@ -239,33 +273,22 @@ export default function ScrapeEmailsPage() {
     }
     
     try {
-      // Get emails directly from the search's emails array
-      const emails = search.emails || []
+      // Extract emails from the new structure
+      const allEmails = extractAllEmails(search.emails)
       
-      if (!emails || emails.length === 0) {
+      if (!allEmails || allEmails.length === 0) {
         alert('No emails found for this search.')
         return
       }
       
-      // Parse emails if they're stored as strings (might be JSON strings)
-      let parsedEmails = emails
-      if (typeof emails[0] === 'string' && emails[0].startsWith('{')) {
-        parsedEmails = emails.map(emailStr => JSON.parse(emailStr))
-      }
-      
       // Create CSV content
-      const headers = ['Email', 'Source', 'Website', 'Name', 'Company', 'Title', 'Location', 'Found At']
-      const csvRows = parsedEmails.map(email => {
-        const emailData = typeof email === 'string' ? { email } : email
+      const headers = ['Email', 'Source', 'Website', 'Found At']
+      const csvRows = allEmails.map(email => {
         return [
-          emailData.email || '',
-          emailData.source || '',
-          emailData.website || '',
-          emailData.name || '',
-          emailData.company || '',
-          emailData.title || '',
-          emailData.location || '',
-          emailData.foundAt || emailData.created_at || new Date().toLocaleString()
+          email.email || '',
+          email.source || '',
+          email.website || '',
+          email.foundAt || new Date().toLocaleString()
         ]
       })
       
@@ -378,7 +401,7 @@ export default function ScrapeEmailsPage() {
               </div>
             </div>
           </div>
-          {/* <div className="bg-white p-4 rounded-lg border border-gray-200">
+          <div className="bg-white p-4 rounded-lg border border-gray-200">
             <div className="flex items-center">
               <div className="p-2 bg-blue-100 rounded-lg mr-3">
                 <FaEnvelope className="h-5 w-5 text-blue-600" />
@@ -390,7 +413,7 @@ export default function ScrapeEmailsPage() {
                 </p>
               </div>
             </div>
-          </div> */}
+          </div>
           <div className="bg-white p-4 rounded-lg border border-gray-200">
             <div className="flex items-center">
               <div className="p-2 bg-green-100 rounded-lg mr-3">
