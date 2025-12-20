@@ -4,7 +4,8 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 /**
- * Checks if 24 hours have passed since last_sent and resets sent_today to 0 if needed
+ * Checks if we've entered a new calendar day since last_sent and resets sent_today to 0 if needed
+ * Resets at midnight (12:00 AM) - calendar day reset, not rolling 24-hour window
  * @param {Object} account - Email account object with last_sent and sent_today
  * @returns {Object} - Account object with potentially reset sent_today
  */
@@ -15,10 +16,22 @@ export function shouldResetDailyCount(account) {
 
   const lastSent = new Date(account.last_sent)
   const now = new Date()
-  const hoursSinceLastSent = (now - lastSent) / (1000 * 60 * 60) // Convert to hours
+  
+  // Get UTC dates (year, month, day) for comparison
+  const lastSentDate = new Date(Date.UTC(
+    lastSent.getUTCFullYear(),
+    lastSent.getUTCMonth(),
+    lastSent.getUTCDate()
+  ))
+  
+  const todayDate = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate()
+  ))
 
-  // If 24 hours or more have passed, reset sent_today to 0
-  if (hoursSinceLastSent >= 24) {
+  // If last_sent was on a different calendar day, reset sent_today to 0
+  if (lastSentDate.getTime() < todayDate.getTime()) {
     return { ...account, sent_today: 0 }
   }
 
@@ -26,7 +39,8 @@ export function shouldResetDailyCount(account) {
 }
 
 /**
- * Resets sent_today to 0 for accounts where 24 hours have passed since last_sent
+ * Resets sent_today to 0 for accounts where we've entered a new calendar day since last_sent
+ * Resets at midnight (12:00 AM) - calendar day reset, not rolling 24-hour window
  * This is a server-side function that updates the database
  * @param {string|number} accountId - Optional account ID to reset. If not provided, resets all accounts that need resetting
  * @returns {Promise<{success: boolean, resetCount: number, error?: string}>}
@@ -61,13 +75,25 @@ export async function resetDailyCountsIfNeeded(accountId = null) {
       return { success: true, resetCount: 0 }
     }
 
-    // Filter accounts where 24 hours have passed
+    // Filter accounts where we've entered a new calendar day
     const now = new Date()
+    const todayDate = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate()
+    ))
+
     const accountsToReset = accounts.filter((account) => {
       if (!account.last_sent) return false
       const lastSent = new Date(account.last_sent)
-      const hoursSinceLastSent = (now - lastSent) / (1000 * 60 * 60)
-      return hoursSinceLastSent >= 24
+      const lastSentDate = new Date(Date.UTC(
+        lastSent.getUTCFullYear(),
+        lastSent.getUTCMonth(),
+        lastSent.getUTCDate()
+      ))
+      
+      // Reset if last_sent was on a different calendar day (before today)
+      return lastSentDate.getTime() < todayDate.getTime()
     })
 
     if (accountsToReset.length === 0) {
@@ -93,7 +119,7 @@ export async function resetDailyCountsIfNeeded(accountId = null) {
 }
 
 /**
- * Gets account with sent_today reset if 24 hours have passed
+ * Gets account with sent_today reset if we've entered a new calendar day
  * This is a client-side function that normalizes the data
  * @param {Object} account - Email account object
  * @returns {Object} - Account with potentially reset sent_today

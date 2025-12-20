@@ -81,7 +81,7 @@ export async function POST(request) {
       throw new Error('Email account not available or inactive')
     }
 
-    // Reset daily count if 24 hours have passed since last_sent
+    // Reset daily count if we've entered a new calendar day (resets at midnight)
     await resetDailyCountsIfNeeded(account.id)
 
     // Fetch the account again to get the updated sent_today value

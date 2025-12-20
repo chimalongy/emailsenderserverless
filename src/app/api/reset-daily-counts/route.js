@@ -3,7 +3,7 @@ import { resetDailyCountsIfNeeded } from '../../lib/resetDailyCounts'
 
 export async function POST(request) {
   try {
-    // Reset sent_today for accounts where 24 hours have passed since last_sent
+    // Reset sent_today for accounts where we've entered a new calendar day (resets at midnight)
     const result = await resetDailyCountsIfNeeded()
 
     if (!result.success) {

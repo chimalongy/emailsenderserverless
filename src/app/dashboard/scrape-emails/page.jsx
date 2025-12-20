@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { FaEnvelope, FaPlus, FaFolder, FaFileAlt, FaTrash, FaDownload, FaCalendarAlt, FaSpinner, FaSearch, FaExclamationCircle, FaSync, FaEye } from 'react-icons/fa'
+import { FaEnvelope, FaPlus, FaFolder, FaFileAlt, FaTrash, FaDownload, FaCalendarAlt, FaSpinner, FaSearch, FaExclamationCircle, FaSync, FaEye, FaRedo } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import SearchModal from './components/searchmodal'
 import { supabase } from '../../lib/supabase'
@@ -16,6 +16,7 @@ export default function ScrapeEmailsPage() {
   const [error, setError] = useState(null)
   const [selectedSearch, setSelectedSearch] = useState(null)
   const [emailCounts, setEmailCounts] = useState({}) // Store real email counts
+  const [rescrappingStates, setRescrappingStates] = useState({}) // Track re-scrape loading states
 
   // Helper function to count emails from the new structure
   const countEmailsFromStructure = (emailsData) => {
@@ -156,6 +157,14 @@ export default function ScrapeEmailsPage() {
               [payload.new.id]: countEmailsFromStructure(payload.new.emails)
             }))
           }
+          
+          // If a re-scrape just started, update the loading state
+          if (payload.eventType === 'UPDATE' && payload.new.status === 'processing') {
+            setRescrappingStates(prev => ({
+              ...prev,
+              [payload.new.id]: false
+            }))
+          }
         }
       )
       .subscribe()
@@ -228,6 +237,157 @@ export default function ScrapeEmailsPage() {
     
     setSearches(prev => [formattedSearch, ...prev])
     setShowSearchModal(false)
+  }
+
+  // NEW FUNCTION: Handle re-scraping of URLs
+  const handleReScrape = async (search, e) => {
+    e?.stopPropagation()
+    
+    if (!user) {
+      console.error('User not authenticated')
+      alert('Please sign in to re-scrape')
+      return
+    }
+    
+    // Check if search has URLs to re-scrape
+    const urls = search.urls || []
+    if (urls.length === 0) {
+      alert('This search has no URLs to re-scrape')
+      return
+    }
+    
+    // Set loading state for this specific search
+    setRescrappingStates(prev => ({
+      ...prev,
+      [search.id]: true
+    }))
+    
+    let scrappingId = null
+    
+    try {
+      // Step 1: Create a new scrapping entry in database
+      const { data, error: dbError } = await supabase
+        .from('scrappings')
+        .insert({
+          user_id: user.id,
+          name: `${search.name} (Re-scrape)`,
+          method: 'urls',
+          urls,
+          status: 'pending'
+        })
+        .select()
+        .single()
+
+      if (dbError) {
+        console.error('Database error:', dbError)
+        throw new Error(`Database error: ${dbError.message}`)
+      }
+
+      scrappingId = data.id
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        throw new Error('Your session has expired. Please sign in again.')
+      }
+
+      // Step 2: Call the API route to start the scrapping process (same as modal)
+      const response = await fetch('/api/scrappings/start-scrapping', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          scrapping: {
+            id: data.id,
+            user_id: data.user_id,
+            method: data.method,
+            urls: data.urls,
+            name: data.name
+          }
+        }),
+      })
+
+      // Check response
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('API Error Response:', errorText)
+        
+        let errorData = {}
+        try {
+          errorData = JSON.parse(errorText)
+        } catch {
+          errorData = { message: `HTTP ${response.status}: ${response.statusText}` }
+        }
+        
+        throw new Error(`API failed: ${response.status} - ${errorData.message || errorData.error || 'Unknown error'}`)
+      }
+
+      // Step 3: Update status to processing
+      const { error: updateError } = await supabase
+        .from('scrappings')
+        .update({ 
+          status: 'processing',
+          started_at: new Date().toISOString()
+        })
+        .eq('id', data.id)
+
+      if (updateError) {
+        console.error('Failed to update status:', updateError)
+      }
+
+      // Step 4: Add the new search to the list
+      const newSearch = {
+        id: data.id,
+        name: data.name,
+        query: 'URL list re-scraping',
+        emailCount: 0,
+        createdAt: new Date(data.created_at).toISOString().split('T')[0],
+        updatedAt: new Date(data.updated_at).toISOString().split('T')[0],
+        status: 'processing',
+        method: data.method,
+        urls: data.urls,
+        emails: []
+      }
+      
+      setSearches(prev => [newSearch, ...prev])
+      
+      // Clear loading state
+      setRescrappingStates(prev => ({
+        ...prev,
+        [search.id]: false
+      }))
+      
+      // Show success message
+      alert(`Re-scraping started for ${urls.length} URLs. Check the new search in your list.`)
+      
+    } catch (error) {
+      console.error('Re-scraping failed:', error)
+      
+      // Update the scrapping status to failed if we have an ID
+      if (scrappingId) {
+        try {
+          await supabase
+            .from('scrappings')
+            .update({ 
+              status: 'failed',
+              error: error.message || 'Unknown error'
+            })
+            .eq('id', scrappingId)
+        } catch (updateError) {
+          console.error('Failed to update failed status:', updateError)
+        }
+      }
+      
+      // Show error to user
+      alert(`Failed to start re-scraping: ${error.message}`)
+      
+      // Clear loading state on error
+      setRescrappingStates(prev => ({
+        ...prev,
+        [search.id]: false
+      }))
+    }
   }
 
   const handleDeleteSearch = async (id, e) => {
@@ -401,7 +561,7 @@ export default function ScrapeEmailsPage() {
               </div>
             </div>
           </div>
-          <div className="bg-white p-4 rounded-lg border border-gray-200">
+          {/* <div className="bg-white p-4 rounded-lg border border-gray-200">
             <div className="flex items-center">
               <div className="p-2 bg-blue-100 rounded-lg mr-3">
                 <FaEnvelope className="h-5 w-5 text-blue-600" />
@@ -413,7 +573,7 @@ export default function ScrapeEmailsPage() {
                 </p>
               </div>
             </div>
-          </div>
+          </div> */}
           <div className="bg-white p-4 rounded-lg border border-gray-200">
             <div className="flex items-center">
               <div className="p-2 bg-green-100 rounded-lg mr-3">
@@ -472,6 +632,9 @@ export default function ScrapeEmailsPage() {
               {searches.map((search) => {
                 const realEmailCount = getRealEmailCount(search)
                 const isProcessing = search.status === 'processing' || search.status === 'pending'
+                const canReScrape = (search.status === 'completed' || search.status === 'failed') && 
+                                    search.urls && search.urls.length > 0
+                const isReScrapping = rescrappingStates[search.id] || false
                 
                 return (
                   <div
@@ -562,32 +725,60 @@ export default function ScrapeEmailsPage() {
 
                       {selectedSearch === search.id && (
                         <div className="mt-3 pt-3 border-t border-gray-200">
-                          <div className="flex gap-2">
-                            <button
-                              onClick={(e) => handleDownload(search, e)}
-                              disabled={search.status !== 'completed'}
-                              className={`flex-1 px-3 py-1.5 rounded-lg flex items-center justify-center text-sm ${
-                                search.status === 'completed'
-                                  ? 'bg-teal-600 text-white hover:bg-teal-700'
-                                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                              }`}
-                            >
-                              <FaDownload className="mr-1.5" />
-                              Download CSV ({realEmailCount})
-                            </button>
-                            <button
-                              onClick={(e) => handleViewDetails(search.id, e)}
-                              className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm flex items-center justify-center"
-                            >
-                              <FaEye className="mr-1.5" />
-                              View
-                            </button>
+                          <div className="flex flex-col gap-2">
+                            <div className="flex gap-2">
+                              <button
+                                onClick={(e) => handleDownload(search, e)}
+                                disabled={search.status !== 'completed'}
+                                className={`flex-1 px-3 py-1.5 rounded-lg flex items-center justify-center text-sm ${
+                                  search.status === 'completed'
+                                    ? 'bg-teal-600 text-white hover:bg-teal-700'
+                                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                }`}
+                              >
+                                <FaDownload className="mr-1.5" />
+                                Download CSV ({realEmailCount})
+                              </button>
+                              <button
+                                onClick={(e) => handleViewDetails(search.id, e)}
+                                className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm flex items-center justify-center"
+                              >
+                                <FaEye className="mr-1.5" />
+                                View
+                              </button>
+                            </div>
+                            
+                            {/* Re-scrape Button - Only show for completed/failed searches with URLs */}
+                            {canReScrape && (
+                              <button
+                                onClick={(e) => handleReScrape(search, e)}
+                                disabled={isReScrapping}
+                                className={`mt-1 px-3 py-1.5 rounded-lg flex items-center justify-center text-sm ${
+                                  isReScrapping
+                                    ? 'bg-gray-400 text-white cursor-not-allowed'
+                                    : 'bg-teal-600 text-white hover:bg-teal-700'
+                                }`}
+                              >
+                                {isReScrapping ? (
+                                  <>
+                                    <FaSpinner className="mr-1.5 animate-spin" />
+                                    Starting Re-scrape...
+                                  </>
+                                ) : (
+                                  <>
+                                    <FaRedo className="mr-1.5" />
+                                    Re-scrape {search.urls.length} URLs
+                                  </>
+                                )}
+                              </button>
+                            )}
                           </div>
                           <p className="text-xs text-gray-500 mt-2">
                             Created on {search.createdAt}. 
                             {search.method === 'query' && ` ${search.queries?.length || 0} search queries.`}
                             {search.method === 'urls' && ` ${search.urls?.length || 0} URLs to process.`}
                             {isProcessing && ' Emails are being collected in real-time...'}
+                            {canReScrape && ' Click "Re-scrape" to refresh email data from URLs.'}
                           </p>
                         </div>
                       )}
