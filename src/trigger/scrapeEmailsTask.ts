@@ -32,6 +32,21 @@ async function fetchWithTimeout(
 }
 
 /* ----------------------------------
+   SSL error detector
+----------------------------------- */
+function isSSLError(err: any): boolean {
+  const msg = err?.message?.toLowerCase() ?? "";
+
+  return (
+    err?.code === "EPROTO" ||
+    msg.includes("ssl") ||
+    msg.includes("handshake") ||
+    msg.includes("openssl") ||
+    msg.includes("alert number 40")
+  );
+}
+
+/* ----------------------------------
    URL helpers
 ----------------------------------- */
 function stripWWW(url: string): string {
@@ -77,6 +92,45 @@ function extractRelevantLinks(html: string, baseUrl: string): string[] {
 }
 
 /* ----------------------------------
+   Email filtering helpers
+----------------------------------- */
+function applyEmailFilters(
+  emails: string[],
+  filterItems: string[],
+  startsWithItems: string[]
+): string[] {
+  let processed = [...emails];
+
+  // 1. Strip starts_with prefixes
+  if (startsWithItems.length) {
+    processed = processed.map((email) => {
+      for (const prefix of startsWithItems) {
+        if (
+          prefix &&
+          email.toLowerCase().startsWith(prefix.toLowerCase())
+        ) {
+          return email.slice(prefix.length);
+        }
+      }
+      return email;
+    });
+  }
+
+  // 2. Remove emails containing filter_item
+  if (filterItems.length) {
+    processed = processed.filter((email) => {
+      const lower = email.toLowerCase();
+      return !filterItems.some(
+        (item) => item && lower.includes(item.toLowerCase())
+      );
+    });
+  }
+
+  // 3. Deduplicate
+  return Array.from(new Set(processed));
+}
+
+/* ----------------------------------
    Payload schema
 ----------------------------------- */
 const payloadSchema = z.object({
@@ -106,6 +160,17 @@ export const scrapeEmailsTask = task({
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
+    /* -------- Fetch email filters -------- */
+    const { data: filters } = await supabase
+      .from("scrape_email_filters")
+      .select("filter_item, starts_with");
+
+    const filterItems =
+      filters?.map((f) => f.filter_item).filter(Boolean) ?? [];
+
+    const startsWithItems =
+      filters?.map((f) => f.starts_with).filter(Boolean) ?? [];
+
     await supabase
       .from("scrappings")
       .update({
@@ -133,11 +198,9 @@ export const scrapeEmailsTask = task({
             const res = await fetchWithTimeout(originalUrl);
             homeHtml = await res.text();
           } catch (err: any) {
-            // Retry without www for SSL or DNS issues
             if (
               originalUrl.includes("www.") &&
-              (err.message?.includes("certificate") ||
-                err.code === "ENOTFOUND")
+              (isSSLError(err) || err.code === "ENOTFOUND")
             ) {
               finalUrl = stripWWW(originalUrl);
               const res = await fetchWithTimeout(finalUrl);
@@ -147,18 +210,17 @@ export const scrapeEmailsTask = task({
             }
           }
         } catch (err: any) {
-          // ❗ NON-FATAL ERRORS → SKIP
           if (
             err.name === "AbortError" ||
             err.code === "ENOTFOUND" ||
             err.code === "EAI_AGAIN" ||
             err.code === "ECONNREFUSED" ||
-            err.code === "ECONNRESET"
+            err.code === "ECONNRESET" ||
+            isSSLError(err)
           ) {
             results.push({ link_scraped: originalUrl, emails: [] });
             continue;
           }
-
           throw err;
         }
 
@@ -177,8 +239,7 @@ export const scrapeEmailsTask = task({
             } catch (err: any) {
               if (
                 link.includes("www.") &&
-                (err.message?.includes("certificate") ||
-                  err.code === "ENOTFOUND")
+                (isSSLError(err) || err.code === "ENOTFOUND")
               ) {
                 const fallback = stripWWW(link);
                 const res = await fetchWithTimeout(fallback);
@@ -190,20 +251,27 @@ export const scrapeEmailsTask = task({
 
             extractEmails(html).forEach(addEmail);
           } catch (err: any) {
-            // Ignore subpage failures
             if (
               err.name === "AbortError" ||
               err.code === "ENOTFOUND" ||
-              err.code === "EAI_AGAIN"
+              err.code === "EAI_AGAIN" ||
+              isSSLError(err)
             ) {
               continue;
             }
           }
         }
 
+        /* ---------- APPLY EMAIL FILTERS ---------- */
+        const filteredEmails = applyEmailFilters(
+          emails,
+          filterItems,
+          startsWithItems
+        );
+
         results.push({
           link_scraped: originalUrl,
-          emails,
+          emails: filteredEmails,
         });
       }
 
@@ -236,4 +304,3 @@ export const scrapeEmailsTask = task({
     }
   },
 });
- 
