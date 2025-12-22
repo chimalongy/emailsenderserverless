@@ -65,7 +65,7 @@ function stripWWW(url: string): string {
 }
 
 /* ----------------------------------
-   Email helpers
+   Helpers
 ----------------------------------- */
 const emailRegex =
   /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
@@ -74,9 +74,6 @@ function extractEmails(html: string): string[] {
   return Array.from(new Set(html.match(emailRegex) ?? []));
 }
 
-/* ----------------------------------
-   Relevant links (contact/about)
------------------------------------ */
 function extractRelevantLinks(html: string, baseUrl: string): string[] {
   const $ = cheerio.load(html);
   const links: string[] = [];
@@ -98,47 +95,7 @@ function extractRelevantLinks(html: string, baseUrl: string): string[] {
 }
 
 /* ----------------------------------
-   Puppeteer fallback (SAFE)
------------------------------------ */
-async function extractEmailsWithPuppeteer(
-  url: string,
-  timeoutMs = 25000
-): Promise<string[]> {
-  let browser: any;
-
-  try {
-    const puppeteer = await import("puppeteer");
-
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
-
-    const page = await browser.newPage();
-    await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    );
-
-    await page.goto(url, {
-      waitUntil: "networkidle2",
-      timeout: timeoutMs,
-    });
-
-    const html = await page.content();
-    return extractEmails(html);
-  } catch {
-    return [];
-  } finally {
-    if (browser) {
-      try {
-        await browser.close();
-      } catch {}
-    }
-  }
-}
-
-/* ----------------------------------
-   Email filtering + normalization
+   Email filtering helpers
 ----------------------------------- */
 function applyEmailFilters(
   emails: string[],
@@ -147,7 +104,7 @@ function applyEmailFilters(
 ): string[] {
   let processed = [...emails];
 
-  // Remove prefix if startsWithItems is defined
+  // Strip starts_with prefixes
   if (startsWithItems.length) {
     processed = processed.map((email) => {
       for (const prefix of startsWithItems) {
@@ -162,7 +119,7 @@ function applyEmailFilters(
     });
   }
 
-  // Filter out unwanted items
+  // Remove emails containing filter_item
   if (filterItems.length) {
     processed = processed.filter((email) => {
       const lower = email.toLowerCase();
@@ -172,12 +129,7 @@ function applyEmailFilters(
     });
   }
 
-  // Normalize: trim, lowercase, and deduplicate
-  processed = Array.from(
-    new Set(processed.map((email) => email.trim().toLowerCase()))
-  );
-
-  return processed;
+  return Array.from(new Set(processed));
 }
 
 /* ----------------------------------
@@ -210,12 +162,14 @@ export const scrapeEmailsTask = task({
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
+    /* -------- Fetch email filters -------- */
     const { data: filters } = await supabase
       .from("scrape_email_filters")
       .select("filter_item, starts_with");
 
     const filterItems =
       filters?.map((f) => f.filter_item).filter(Boolean) ?? [];
+
     const startsWithItems =
       filters?.map((f) => f.starts_with).filter(Boolean) ?? [];
 
@@ -231,43 +185,41 @@ export const scrapeEmailsTask = task({
     const results: ScrapeResult[] = [];
 
     for (const originalUrl of urls) {
-      const emails: string[] = [];
-      const addEmail = (email: string) => {
-        if (!emails.includes(email)) emails.push(email);
-      };
-
       try {
+        const emails: string[] = [];
+        const addEmail = (email: string) => {
+          if (!emails.includes(email)) emails.push(email);
+        };
+
         let homeHtml = "";
         let finalUrl = originalUrl;
 
+        /* ---------- Homepage fetch ---------- */
         try {
-          const res = await fetchWithTimeout(originalUrl);
-          homeHtml = await res.text();
-        } catch (err: any) {
-          if (
-            originalUrl.includes("www.") &&
-            (isSSLError(err) || err.code === "ENOTFOUND")
-          ) {
-            finalUrl = stripWWW(originalUrl);
-            const res = await fetchWithTimeout(finalUrl);
+          try {
+            const res = await fetchWithTimeout(originalUrl);
             homeHtml = await res.text();
-          } else {
-            throw err;
+          } catch (err: any) {
+            if (
+              originalUrl.includes("www.") &&
+              (isSSLError(err) || err.code === "ENOTFOUND")
+            ) {
+              finalUrl = stripWWW(originalUrl);
+              const res = await fetchWithTimeout(finalUrl);
+              homeHtml = await res.text();
+            } else {
+              throw err;
+            }
           }
+        } catch (err: any) {
+          // ✅ Skip this URL on ANY network/SSL error
+          results.push({ link_scraped: originalUrl, emails: [] });
+          continue;
         }
 
-        /* ---------- CHEERIO FIRST ---------- */
-        const homeEmails = extractEmails(homeHtml);
-        homeEmails.forEach(addEmail);
+        extractEmails(homeHtml).forEach(addEmail);
 
-        /* ---------- PUPPETEER FALLBACK ---------- */
-        if (emails.length === 0) {
-          const pupEmails =
-            await extractEmailsWithPuppeteer(finalUrl);
-          pupEmails.forEach(addEmail);
-        }
-
-        /* ---------- CONTACT / ABOUT ---------- */
+        /* ---------- Contact/About pages ---------- */
         const subLinks = extractRelevantLinks(homeHtml, finalUrl);
 
         for (const link of subLinks) {
@@ -290,20 +242,14 @@ export const scrapeEmailsTask = task({
               }
             }
 
-            const cheerioEmails = extractEmails(html);
-            cheerioEmails.forEach(addEmail);
-
-            if (cheerioEmails.length === 0) {
-              const pupEmails =
-                await extractEmailsWithPuppeteer(link);
-              pupEmails.forEach(addEmail);
-            }
+            extractEmails(html).forEach(addEmail);
           } catch {
-            continue;
+            continue; // never fail on sub-pages
           }
         }
 
-        const filtered = applyEmailFilters(
+        /* ---------- APPLY EMAIL FILTERS ---------- */
+        const filteredEmails = applyEmailFilters(
           emails,
           filterItems,
           startsWithItems
@@ -311,10 +257,12 @@ export const scrapeEmailsTask = task({
 
         results.push({
           link_scraped: originalUrl,
-          emails: filtered,
+          emails: filteredEmails,
         });
       } catch {
+        // Absolute safety: never crash task
         results.push({ link_scraped: originalUrl, emails: [] });
+        continue;
       }
     }
 
@@ -335,3 +283,4 @@ export const scrapeEmailsTask = task({
     return { success: true, results };
   },
 });
+ 

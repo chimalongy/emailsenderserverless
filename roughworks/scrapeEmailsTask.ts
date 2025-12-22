@@ -109,10 +109,11 @@ async function extractEmailsWithPuppeteer(
   try {
     const puppeteer = await import("puppeteer");
 
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
+  browser = await puppeteer.launch({
+  headless: true,
+  args: ["--no-sandbox", "--disable-setuid-sandbox"],
+});
+
 
     const page = await browser.newPage();
     await page.setUserAgent(
@@ -138,7 +139,7 @@ async function extractEmailsWithPuppeteer(
 }
 
 /* ----------------------------------
-   Email filtering + normalization
+   Email filtering
 ----------------------------------- */
 function applyEmailFilters(
   emails: string[],
@@ -147,7 +148,6 @@ function applyEmailFilters(
 ): string[] {
   let processed = [...emails];
 
-  // Remove prefix if startsWithItems is defined
   if (startsWithItems.length) {
     processed = processed.map((email) => {
       for (const prefix of startsWithItems) {
@@ -162,7 +162,6 @@ function applyEmailFilters(
     });
   }
 
-  // Filter out unwanted items
   if (filterItems.length) {
     processed = processed.filter((email) => {
       const lower = email.toLowerCase();
@@ -172,12 +171,7 @@ function applyEmailFilters(
     });
   }
 
-  // Normalize: trim, lowercase, and deduplicate
-  processed = Array.from(
-    new Set(processed.map((email) => email.trim().toLowerCase()))
-  );
-
-  return processed;
+  return Array.from(new Set(processed));
 }
 
 /* ----------------------------------

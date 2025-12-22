@@ -32,7 +32,8 @@ import {
   FaListAlt,
   FaChevronRight,
   FaEye,
-  FaEyeSlash
+  FaEyeSlash,
+  FaLink
 } from 'react-icons/fa'
 import Link from 'next/link'
 
@@ -44,10 +45,10 @@ export default function ScrapeDetailsPage() {
   
   const [search, setSearch] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [scrapedData, setScrapedData] = useState([]) // Original data with link_scraped structure
+  const [scrapedData, setScrapedData] = useState([])
   const [filteredData, setFilteredData] = useState([])
   const [expandedSources, setExpandedSources] = useState(new Set())
-  const [isAddingEmail, setIsAddingEmail] = useState(null) // Which source is being added to
+  const [isAddingEmail, setIsAddingEmail] = useState(null)
   const [newEmail, setNewEmail] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [isSaving, setIsSaving] = useState(false)
@@ -80,9 +81,7 @@ export default function ScrapeDetailsPage() {
       if (data) {
         setSearch(data)
         
-        // Handle the new data structure
         if (data.emails && data.emails.length > 0) {
-          // Process data to ensure unique keys
           const processedData = processScrapedData(data.emails)
           setScrapedData(processedData)
           setFilteredData(processedData)
@@ -108,17 +107,15 @@ export default function ScrapeDetailsPage() {
     
     data.forEach((item, index) => {
       if (item && item.link_scraped) {
-        // Count occurrences of each URL
         urlCount[item.link_scraped] = (urlCount[item.link_scraped] || 0) + 1
         
-        // Create a unique ID for each item
         const uniqueId = urlCount[item.link_scraped] > 1 
           ? `${item.link_scraped}-${urlCount[item.link_scraped]}` 
           : item.link_scraped
         
         processed.push({
           ...item,
-          uniqueId, // Add a unique identifier
+          uniqueId,
           originalIndex: index
         })
       }
@@ -178,7 +175,7 @@ export default function ScrapeDetailsPage() {
     const newExpanded = new Set(expandedSources)
     if (newExpanded.has(uniqueId)) {
       newExpanded.delete(uniqueId)
-      setIsAddingEmail(null) // Close add form if open
+      setIsAddingEmail(null)
     } else {
       newExpanded.add(uniqueId)
     }
@@ -189,7 +186,6 @@ export default function ScrapeDetailsPage() {
   const startAddEmail = (uniqueId) => {
     setIsAddingEmail(uniqueId)
     setNewEmail('')
-    // Expand the source if not already expanded
     if (!expandedSources.has(uniqueId)) {
       setExpandedSources(new Set([...expandedSources, uniqueId]))
     }
@@ -208,7 +204,6 @@ export default function ScrapeDetailsPage() {
       return
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(newEmail)) {
       alert('Please enter a valid email address')
@@ -217,7 +212,6 @@ export default function ScrapeDetailsPage() {
 
     setIsSaving(true)
     try {
-      // Find the source in scrapedData by uniqueId
       const updatedData = scrapedData.map(item => {
         if (item.uniqueId === uniqueId) {
           return {
@@ -228,7 +222,6 @@ export default function ScrapeDetailsPage() {
         return item
       })
       
-      // Update in Supabase - reconstruct original structure without uniqueId
       const dataForSupabase = updatedData.map(({ uniqueId, originalIndex, ...rest }) => rest)
       
       const { error } = await supabase
@@ -271,7 +264,6 @@ export default function ScrapeDetailsPage() {
         return item
       })
       
-      // Update in Supabase - reconstruct original structure without uniqueId
       const dataForSupabase = updatedData.map(({ uniqueId, originalIndex, ...rest }) => rest)
       
       const { error } = await supabase
@@ -304,7 +296,6 @@ export default function ScrapeDetailsPage() {
     try {
       const updatedData = scrapedData.filter(item => item.uniqueId !== uniqueId)
       
-      // Update in Supabase - reconstruct original structure without uniqueId
       const dataForSupabase = updatedData.map(({ uniqueId, originalIndex, ...rest }) => rest)
       
       const { error } = await supabase
@@ -334,10 +325,10 @@ export default function ScrapeDetailsPage() {
     }
   }
 
-  // Copy email to clipboard
-  const copyToClipboard = (text) => {
+  // Copy to clipboard with status message
+  const copyToClipboard = (text, message = 'Copied to clipboard!') => {
     navigator.clipboard.writeText(text)
-    setStatusMessage('Copied to clipboard!')
+    setStatusMessage(message)
     setTimeout(() => setStatusMessage(''), 2000)
   }
 
@@ -349,7 +340,18 @@ export default function ScrapeDetailsPage() {
       return
     }
     
-    copyToClipboard(allEmails.join('\n'))
+    copyToClipboard(allEmails.join('\n'), `Copied ${allEmails.length} emails to clipboard!`)
+  }
+
+  // NEW: Copy all URLs to clipboard
+  const copyAllUrls = () => {
+    if (!search || !search.urls || search.urls.length === 0) {
+      alert('No URLs to copy')
+      return
+    }
+    
+    const urlsText = search.urls.join('\n')
+    copyToClipboard(urlsText, `Copied ${search.urls.length} URLs to clipboard!`)
   }
 
   // Download CSV
@@ -469,74 +471,84 @@ export default function ScrapeDetailsPage() {
       <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
         {/* Back button and Status */}
         <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <Link 
               href="/dashboard/scrape-emails" 
-              className="inline-flex items-center text-teal-600 hover:text-teal-700 text-sm sm:text-base mb-2"
+              className="inline-flex items-center text-teal-600 hover:text-teal-700 text-xs sm:text-sm mb-2 truncate"
             >
-              <FaArrowLeft className="mr-1 sm:mr-2" />
-              Back to All Searches
+              <FaArrowLeft className="mr-1 sm:mr-2 flex-shrink-0" />
+              <span className="truncate">Back to All Searches</span>
             </Link>
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{search.name}</h1>
-              <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${getStatusColor(search.status)} self-start sm:self-auto`}>
+              <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate min-w-0" title={search.name}>
+                {search.name}
+              </h1>
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(search.status)} self-start sm:self-auto flex-shrink-0`}>
                 {search.status.charAt(0).toUpperCase() + search.status.slice(1)}
               </span>
             </div>
           </div>
           
           {statusMessage && (
-            <div className="px-3 sm:px-4 py-2 bg-green-100 text-green-800 rounded-lg text-xs sm:text-sm">
+            <div className="px-3 sm:px-4 py-2 bg-green-100 text-green-800 rounded-lg text-xs sm:text-sm flex-shrink-0">
               {statusMessage}
             </div>
           )}
         </div>
 
         {/* Search Info Card */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 mb-4 sm:mb-6">
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            <div>
-              <div className="flex items-center text-gray-600 mb-1 sm:mb-2">
-                <FaFileAlt className="mr-1 sm:mr-2 h-4 w-4" />
-                <span className="text-xs sm:text-sm font-medium">Search Method</span>
+        <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4 lg:p-6 mb-4 sm:mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+            <div className="min-w-0">
+              <div className="flex items-center text-gray-600 mb-1">
+                <FaFileAlt className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                <span className="text-xs sm:text-sm font-medium truncate">Search Method</span>
               </div>
-              <p className="text-gray-900 capitalize text-sm sm:text-base">{search.method}</p>
+              <p className="text-gray-900 capitalize text-sm truncate" title={search.method}>
+                {search.method}
+              </p>
             </div>
             
-            <div>
-              <div className="flex items-center text-gray-600 mb-1 sm:mb-2">
-                <FaEnvelope className="mr-1 sm:mr-2 h-4 w-4" />
-                <span className="text-xs sm:text-sm font-medium">Emails Found</span>
+            <div className="min-w-0">
+              <div className="flex items-center text-gray-600 mb-1">
+                <FaEnvelope className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                <span className="text-xs sm:text-sm font-medium truncate">Emails Found</span>
               </div>
-              <p className="text-gray-900 text-lg sm:text-xl font-semibold">{countTotalEmails().toLocaleString()}</p>
+              <p className="text-gray-900 text-base sm:text-lg lg:text-xl font-semibold truncate">
+                {countTotalEmails().toLocaleString()}
+              </p>
             </div>
             
-            <div>
-              <div className="flex items-center text-gray-600 mb-1 sm:mb-2">
-                <FaGlobe className="mr-1 sm:mr-2 h-4 w-4" />
-                <span className="text-xs sm:text-sm font-medium">Sources</span>
+            <div className="min-w-0">
+              <div className="flex items-center text-gray-600 mb-1">
+                <FaGlobe className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                <span className="text-xs sm:text-sm font-medium truncate">Sources</span>
               </div>
-              <p className="text-gray-900 text-lg sm:text-xl font-semibold">{countTotalSources().toLocaleString()}</p>
+              <p className="text-gray-900 text-base sm:text-lg lg:text-xl font-semibold truncate">
+                {countTotalSources().toLocaleString()}
+              </p>
             </div>
             
-            <div>
-              <div className="flex items-center text-gray-600 mb-1 sm:mb-2">
-                <FaCalendarAlt className="mr-1 sm:mr-2 h-4 w-4" />
-                <span className="text-xs sm:text-sm font-medium">Last Updated</span>
+            <div className="min-w-0">
+              <div className="flex items-center text-gray-600 mb-1">
+                <FaCalendarAlt className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                <span className="text-xs sm:text-sm font-medium truncate">Last Updated</span>
               </div>
-              <p className="text-gray-900 text-xs sm:text-sm">{formatDate(search.updated_at)}</p>
+              <p className="text-gray-900 text-xs sm:text-sm truncate" title={formatDate(search.updated_at)}>
+                {formatDate(search.updated_at)}
+              </p>
             </div>
           </div>
           
           {/* Search Details */}
-          <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-200">
-            <h3 className="text-xs sm:text-sm font-medium text-gray-900 mb-2 sm:mb-3">Search Details</h3>
+          <div className="mt-4 sm:mt-6 pt-4 border-t border-gray-200">
+            <h3 className="text-xs sm:text-sm font-medium text-gray-900 mb-2">Search Details</h3>
             {search.method === 'query' ? (
               <div>
                 <p className="text-xs sm:text-sm text-gray-600 mb-2">Search Queries:</p>
                 <div className="flex flex-wrap gap-1 sm:gap-2">
                   {search.queries?.map((query, index) => (
-                    <span key={index} className="px-2 sm:px-3 py-1 bg-teal-100 text-teal-800 rounded-full text-xs">
+                    <span key={index} className="px-2 py-1 bg-teal-100 text-teal-800 rounded-full text-xs truncate max-w-[200px]" title={query}>
                       {query}
                     </span>
                   ))}
@@ -544,45 +556,66 @@ export default function ScrapeDetailsPage() {
               </div>
             ) : (
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs sm:text-sm text-gray-600">URLs to Process: <span className="font-medium">{search.urls?.length || 0} URLs</span></p>
-                  <button
-                    onClick={() => setShowUrls(!showUrls)}
-                    className="flex items-center text-teal-600 hover:text-teal-700 text-xs sm:text-sm"
-                  >
-                    {showUrls ? (
-                      <>
-                        <span className="mr-1">Hide</span>
-                        <FaChevronUp className="h-3 w-3" />
-                      </>
-                    ) : (
-                      <>
-                        <span className="mr-1">Show</span>
-                        <FaChevronDown className="h-3 w-3" />
-                      </>
-                    )}
-                  </button>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                  <p className="text-xs sm:text-sm text-gray-600 truncate">
+                    URLs to Process: <span className="font-medium">{search.urls?.length || 0} URLs</span>
+                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* NEW: Copy All URLs Button */}
+                    <button
+                      onClick={copyAllUrls}
+                      disabled={!search.urls || search.urls.length === 0}
+                      className={`px-2 sm:px-3 py-1.5 rounded-lg flex items-center justify-center text-xs sm:text-sm ${
+                        !search.urls || search.urls.length === 0
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
+                      title="Copy all URLs to clipboard"
+                    >
+                      <FaLink className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                      <span className="hidden sm:inline">Copy URLs</span>
+                      <span className="sm:hidden">URLs</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => setShowUrls(!showUrls)}
+                      className="flex items-center text-teal-600 hover:text-teal-700 text-xs sm:text-sm whitespace-nowrap"
+                    >
+                      {showUrls ? (
+                        <>
+                          <span className="mr-1">Hide</span>
+                          <FaChevronUp className="h-3 w-3" />
+                        </>
+                      ) : (
+                        <>
+                          <span className="mr-1">Show</span>
+                          <FaChevronDown className="h-3 w-3" />
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
                 
                 {showUrls && (
                   <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="space-y-2 max-h-40 sm:max-h-48 overflow-y-auto">
+                    <div className="space-y-2 max-h-40 sm:max-h-48 overflow-y-auto pr-2">
                       {search.urls?.map((url, index) => (
-                        <div key={index} className="flex items-start">
+                        <div key={index} className="flex items-start group hover:bg-gray-100 p-1 rounded">
                           <FaGlobe className="mt-0.5 mr-2 text-gray-400 flex-shrink-0 h-3 w-3" />
-                          <a 
-                            href={url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-xs sm:text-sm text-gray-900 hover:text-teal-600 break-all flex-1"
-                            title={url}
-                          >
-                            <span className="truncate block sm:hidden">{truncateUrl(url, 40)}</span>
-                            <span className="hidden sm:block">{truncateUrl(url, 70)}</span>
-                          </a>
+                          <div className="flex-1 min-w-0">
+                            <a 
+                              href={url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-xs sm:text-sm text-gray-900 hover:text-teal-600 break-all"
+                              title={url}
+                            >
+                              <span className="truncate block">{truncateUrl(url, 60)}</span>
+                            </a>
+                          </div>
                           <button
-                            onClick={() => copyToClipboard(url)}
-                            className="ml-2 text-gray-400 hover:text-gray-600 flex-shrink-0"
+                            onClick={() => copyToClipboard(url, 'URL copied!')}
+                            className="ml-2 text-gray-400 hover:text-gray-600 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                             title="Copy URL"
                           >
                             <FaCopy className="h-3 w-3" />
@@ -605,46 +638,44 @@ export default function ScrapeDetailsPage() {
         {/* Action Bar */}
         <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4 mb-4 sm:mb-6">
           <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
-            <div className="flex-1 w-full">
+            <div className="flex-1 w-full min-w-0">
               <div className="relative">
-                <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-3 w-3 sm:h-4 sm:w-4" />
                 <input
                   type="text"
                   placeholder="Search sources or emails..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 sm:focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  className="w-full pl-8 sm:pl-10 pr-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                 />
               </div>
             </div>
             
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 onClick={downloadCSV}
                 disabled={countTotalEmails() === 0}
-                className={`px-3 sm:px-4 py-2 rounded-lg flex items-center justify-center text-sm ${
+                className={`px-3 py-2 rounded-lg flex items-center justify-center text-xs sm:text-sm flex-1 sm:flex-none ${
                   countTotalEmails() === 0 
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
                     : 'bg-teal-600 text-white hover:bg-teal-700'
                 }`}
               >
-                <FaDownload className="mr-1 sm:mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Download CSV</span>
-                <span className="sm:hidden">CSV</span>
+                <FaDownload className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                <span className="truncate">CSV</span>
               </button>
               
               <button
                 onClick={copyAllEmails}
                 disabled={countTotalEmails() === 0}
-                className={`px-3 sm:px-4 py-2 rounded-lg flex items-center justify-center text-sm ${
+                className={`px-3 py-2 rounded-lg flex items-center justify-center text-xs sm:text-sm flex-1 sm:flex-none ${
                   countTotalEmails() === 0 
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
                     : 'bg-blue-600 text-white hover:bg-blue-700'
                 }`}
               >
-                <FaCopy className="mr-1 sm:mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Copy All Emails</span>
-                <span className="sm:hidden">Copy All</span>
+                <FaCopy className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                <span className="truncate">Copy All</span>
               </button>
             </div>
           </div>
@@ -653,25 +684,25 @@ export default function ScrapeDetailsPage() {
         {/* Sources Table */}
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           {filteredData.length === 0 ? (
-            <div className="text-center py-8 sm:py-12">
-              <FaGlobe className="h-10 w-10 sm:h-12 sm:w-12 text-gray-300 mx-auto mb-3 sm:mb-4" />
+            <div className="text-center py-8 sm:py-12 px-4">
+              <FaGlobe className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 text-gray-300 mx-auto mb-3" />
               <h3 className="font-medium text-gray-900 mb-1 text-sm sm:text-base">No sources found</h3>
-              <p className="text-gray-600 text-xs sm:text-sm mb-3 sm:mb-4">
+              <p className="text-gray-600 text-xs sm:text-sm mb-4">
                 {searchTerm ? 'Try a different search term' : 'Wait for scraping to complete or add URLs manually'}
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto -mx-3 sm:mx-0">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 sm:px-4 lg:px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Source URL
                     </th>
-                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 sm:px-4 lg:px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Emails
                     </th>
-                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-3 sm:px-4 lg:px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
@@ -685,78 +716,78 @@ export default function ScrapeDetailsPage() {
                     return (
                       <React.Fragment key={item.uniqueId}>
                         <tr className="hover:bg-gray-50">
-                          <td className="px-3 sm:px-6 py-3">
-                            <div className="flex items-center">
+                          <td className="px-3 sm:px-4 lg:px-6 py-3">
+                            <div className="flex items-center min-w-0">
                               <button
                                 onClick={() => toggleSourceExpansion(item.uniqueId)}
-                                className="mr-2 text-gray-400 hover:text-gray-600"
+                                className="mr-2 text-gray-400 hover:text-gray-600 flex-shrink-0"
                               >
                                 {isExpanded ? (
-                                  <FaChevronDown className="h-4 w-4" />
+                                  <FaChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
                                 ) : (
-                                  <FaChevronRight className="h-4 w-4" />
+                                  <FaChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
                                 )}
                               </button>
-                              <div className="min-w-0">
+                              <div className="flex-1 min-w-0">
                                 <a 
                                   href={item.link_scraped} 
                                   target="_blank" 
                                   rel="noopener noreferrer"
-                                  className="text-sm font-medium text-teal-600 hover:text-teal-800 truncate block max-w-[200px] sm:max-w-[300px]"
+                                  className="text-xs sm:text-sm font-medium text-teal-600 hover:text-teal-800 truncate block"
                                   title={item.link_scraped}
                                 >
-                                  {truncateUrl(item.link_scraped, 40)}
+                                  {truncateUrl(item.link_scraped, 35)}
                                 </a>
-                                <div className="text-xs text-gray-500 mt-1">
+                                <div className="text-xs text-gray-500 mt-0.5 truncate">
                                   {emailCount} email{emailCount !== 1 ? 's' : ''}
                                 </div>
                               </div>
                             </div>
                           </td>
-                          <td className="px-3 sm:px-6 py-3">
+                          <td className="px-3 sm:px-4 lg:px-6 py-3">
                             {hasEmails ? (
-                              <div className="flex items-center">
-                                <FaEnvelope className="mr-2 text-gray-400 h-4 w-4 flex-shrink-0" />
-                                <div className="min-w-0">
-                                  <div className="text-sm text-gray-900 truncate max-w-[150px] sm:max-w-[250px]">
-                                    {item.emails[0]}
+                              <div className="flex items-center min-w-0">
+                                <FaEnvelope className="mr-2 text-gray-400 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-xs sm:text-sm text-gray-900 truncate" title={item.emails[0]}>
+                                    {truncateUrl(item.emails[0], 25)}
                                   </div>
                                   {emailCount > 1 && (
-                                    <div className="text-xs text-gray-500">
-                                      +{emailCount - 1} more email{emailCount - 1 !== 1 ? 's' : ''}
+                                    <div className="text-xs text-gray-500 truncate">
+                                      +{emailCount - 1} more
                                     </div>
                                   )}
                                 </div>
                               </div>
                             ) : (
                               <div className="flex items-center text-gray-400">
-                                <FaEnvelope className="mr-2 h-4 w-4 flex-shrink-0" />
-                                <span className="text-sm">No emails found</span>
+                                <FaEnvelope className="mr-2 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                <span className="text-xs sm:text-sm">No emails</span>
                               </div>
                             )}
                           </td>
-                          <td className="px-3 sm:px-6 py-3 whitespace-nowrap text-sm font-medium">
-                            <div className="flex items-center gap-1 sm:gap-2">
+                          <td className="px-3 sm:px-4 lg:px-6 py-3 whitespace-nowrap">
+                            <div className="flex items-center gap-1 sm:gap-2 justify-end">
                               <button
                                 onClick={() => startAddEmail(item.uniqueId)}
                                 className="text-teal-600 hover:text-teal-900 p-1"
                                 title="Add email"
                               >
-                                <FaPlus className="h-4 w-4" />
+                                <FaPlus className="h-3 w-3 sm:h-4 sm:w-4" />
                               </button>
                               <button
-                                onClick={() => copyToClipboard(item.link_scraped)}
+                                onClick={() => copyToClipboard(item.link_scraped, 'URL copied!')}
                                 className="text-blue-600 hover:text-blue-900 p-1"
                                 title="Copy URL"
                               >
-                                <FaCopy className="h-4 w-4" />
+                                <FaCopy className="h-3 w-3 sm:h-4 sm:w-4" />
                               </button>
                               <button
                                 onClick={() => deleteSource(item.uniqueId)}
                                 className="text-red-600 hover:text-red-900 p-1"
                                 title="Delete source"
                               >
-                                <FaTrash className="h-4 w-4" />
+                                <FaTrash className="h-3 w-3 sm:h-4 sm:w-4" />
                               </button>
                             </div>
                           </td>
@@ -764,38 +795,40 @@ export default function ScrapeDetailsPage() {
                         
                         {/* Expanded row for emails list */}
                         {isExpanded && (
-                          <tr key={`${item.uniqueId}-expanded`} className="bg-gray-50">
-                            <td colSpan={3} className="px-3 sm:px-6 py-3">
-                              <div className="pl-8 sm:pl-10">
+                          <tr className="bg-gray-50">
+                            <td colSpan={3} className="px-3 sm:px-4 lg:px-6 py-3">
+                              <div className="pl-8 sm:pl-10 lg:pl-12">
                                 {/* Add email form */}
                                 {isAddingEmail === item.uniqueId && (
                                   <div className="mb-3 p-3 bg-white rounded-lg border border-gray-200">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                                       <input
                                         type="email"
                                         value={newEmail}
                                         onChange={(e) => setNewEmail(e.target.value)}
                                         placeholder="Enter email address"
-                                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                                        className="flex-1 px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                                         onKeyPress={(e) => e.key === 'Enter' && saveNewEmail(item.uniqueId)}
                                       />
-                                      <button
-                                        onClick={() => saveNewEmail(item.uniqueId)}
-                                        disabled={isSaving || !newEmail.trim()}
-                                        className="px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                                      >
-                                        {isSaving ? (
-                                          <FaSpinner className="animate-spin h-4 w-4" />
-                                        ) : (
-                                          'Add'
-                                        )}
-                                      </button>
-                                      <button
-                                        onClick={cancelAddEmail}
-                                        className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
-                                      >
-                                        Cancel
-                                      </button>
+                                      <div className="flex gap-2">
+                                        <button
+                                          onClick={() => saveNewEmail(item.uniqueId)}
+                                          disabled={isSaving || !newEmail.trim()}
+                                          className="px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm flex-1 sm:flex-none"
+                                        >
+                                          {isSaving ? (
+                                            <FaSpinner className="animate-spin h-3 w-3 sm:h-4 sm:w-4" />
+                                          ) : (
+                                            'Add'
+                                          )}
+                                        </button>
+                                        <button
+                                          onClick={cancelAddEmail}
+                                          className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-xs sm:text-sm flex-1 sm:flex-none"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
                                     </div>
                                   </div>
                                 )}
@@ -804,16 +837,16 @@ export default function ScrapeDetailsPage() {
                                 {hasEmails ? (
                                   <div className="space-y-2">
                                     {item.emails.map((email, index) => (
-                                      <div key={`${item.uniqueId}-email-${index}`} className="flex items-center justify-between p-2 bg-white rounded border border-gray-200">
+                                      <div key={index} className="flex items-center justify-between p-2 bg-white rounded border border-gray-200">
                                         <div className="flex items-center flex-1 min-w-0">
                                           <FaEnvelope className="mr-2 text-gray-400 h-3 w-3 flex-shrink-0" />
-                                          <span className="text-sm text-gray-900 truncate flex-1" title={email}>
+                                          <span className="text-xs sm:text-sm text-gray-900 truncate flex-1" title={email}>
                                             {email}
                                           </span>
                                         </div>
-                                        <div className="flex items-center gap-2 ml-2">
+                                        <div className="flex items-center gap-2 ml-2 flex-shrink-0">
                                           <button
-                                            onClick={() => copyToClipboard(email)}
+                                            onClick={() => copyToClipboard(email, 'Email copied!')}
                                             className="text-blue-600 hover:text-blue-900 p-1"
                                             title="Copy email"
                                           >
@@ -832,12 +865,12 @@ export default function ScrapeDetailsPage() {
                                   </div>
                                 ) : (
                                   <div className="text-center py-4">
-                                    <FaEnvelope className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                                    <p className="text-gray-500 text-sm">No emails found for this source</p>
+                                    <FaEnvelope className="h-6 w-6 sm:h-8 sm:w-8 text-gray-300 mx-auto mb-2" />
+                                    <p className="text-gray-500 text-xs sm:text-sm">No emails found for this source</p>
                                     {!isAddingEmail && (
                                       <button
                                         onClick={() => startAddEmail(item.uniqueId)}
-                                        className="mt-2 px-3 py-1 text-teal-600 hover:text-teal-700 text-sm"
+                                        className="mt-2 px-3 py-1 text-teal-600 hover:text-teal-700 text-xs sm:text-sm"
                                       >
                                         + Add first email
                                       </button>
@@ -850,10 +883,10 @@ export default function ScrapeDetailsPage() {
                                   <div className="mt-3">
                                     <button
                                       onClick={() => startAddEmail(item.uniqueId)}
-                                      className="flex items-center text-teal-600 hover:text-teal-700 text-sm"
+                                      className="flex items-center text-teal-600 hover:text-teal-700 text-xs sm:text-sm"
                                     >
                                       <FaPlus className="mr-1 h-3 w-3" />
-                                      Add another email to this source
+                                      Add another email
                                     </button>
                                   </div>
                                 )}
@@ -871,13 +904,13 @@ export default function ScrapeDetailsPage() {
           
           {/* Pagination Info */}
           {filteredData.length > 0 && (
-            <div className="px-3 sm:px-6 py-2 sm:py-3 border-t border-gray-200">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                <div className="text-xs sm:text-sm text-gray-700">
+            <div className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 border-t border-gray-200">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs sm:text-sm">
+                <div className="text-gray-700 truncate">
                   Showing <span className="font-medium">{filteredData.length}</span> of{' '}
                   <span className="font-medium">{scrapedData.length}</span> sources
                 </div>
-                <div className="text-xs sm:text-sm text-gray-700">
+                <div className="text-gray-700 truncate">
                   Total emails: <span className="font-medium">{countTotalEmails().toLocaleString()}</span>
                 </div>
               </div>
