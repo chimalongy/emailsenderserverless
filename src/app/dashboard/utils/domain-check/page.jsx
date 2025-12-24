@@ -179,10 +179,6 @@ export default function DomainCheckPage() {
     <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Domain Name Check</h1>
-          <p className="text-sm sm:text-base text-gray-600">Check domain registration status in bulk</p>
-        </div>
         <div className="flex items-center gap-2 self-end sm:self-auto">
           <button onClick={loadSample} className="px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Load Sample</button>
           <button onClick={clearAll} className="px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors">Clear All</button>
@@ -340,32 +336,18 @@ export default function DomainCheckPage() {
             <div className="border border-gray-200 rounded-lg overflow-hidden">
               <div className="bg-gray-50 px-2 sm:px-4 py-2 sm:py-3 border-b border-gray-200">
                 <div className="grid grid-cols-10 gap-2 sm:gap-4 text-xs sm:text-sm font-medium text-gray-600">
-                  <div className="col-span-5 sm:col-span-4">Domain</div>
-                  <div className="col-span-3 sm:col-span-3">Status</div>
-                  <div className="col-span-2 sm:col-span-3 text-right sm:text-left">Expires</div>
+                  <div className="col-span-6 sm:col-span-7">Domain</div>
+                  <div className="col-span-4 sm:col-span-3">Status</div>
                 </div>
               </div>
               <div className="max-h-64 sm:max-h-96 overflow-y-auto">
                 {sortedDomains.length ? sortedDomains.map((d,i)=>(
                   <div key={i} className={`px-2 sm:px-4 py-2 sm:py-3 border-b border-gray-100 ${getStatusColor(d)}`}>
                     <div className="grid grid-cols-10 gap-2 sm:gap-4 text-xs sm:text-sm items-center">
-                      <div className="col-span-5 sm:col-span-4 font-mono font-medium truncate" title={d.domain}>{d.domain}</div>
-                      <div className="col-span-3 sm:col-span-3 flex items-center gap-1 sm:gap-2">
+                      <div className="col-span-6 sm:col-span-7 font-mono font-medium truncate" title={d.domain}>{d.domain}</div>
+                      <div className="col-span-4 sm:col-span-3 flex items-center gap-1 sm:gap-2">
                         {getStatusIcon(d)}
                         <span className="font-medium truncate">{d.status}</span>
-                      </div>
-                      <div className="col-span-2 sm:col-span-3 text-right sm:text-left">
-                        {d.daysUntilExpiry ? (
-                          <span className={`inline-block px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs font-medium ${
-                            d.daysUntilExpiry<30?'bg-red-100 text-red-800':
-                            d.daysUntilExpiry<90?'bg-yellow-100 text-yellow-800':
-                            'bg-green-100 text-green-800'}`}
-                          >
-                            {d.daysUntilExpiry}d
-                          </span>
-                        ) : (
-                          <span className="text-gray-400 text-xs">N/A</span>
-                        )}
                       </div>
                     </div>
                     {d.createdDate && (

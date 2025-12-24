@@ -36,12 +36,12 @@ export default function UtilsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="text-center mb-8">
+      {/* <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-gray-800 mb-3">Utility Tools</h1>
         <p className="text-gray-600 max-w-2xl mx-auto">
           Powerful tools to streamline your workflow. Process lists, check domains, and automate repetitive tasks.
         </p>
-      </div>
+      </div> */}
 
       {/* Tools Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -74,7 +74,7 @@ export default function UtilsPage() {
               </div>
 
               {/* Features */}
-              <div className="mb-6">
+              <div className="mb-2">
                 <h4 className="text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wider">Features</h4>
                 <ul className="space-y-1">
                   {tool.features.map((feature, index) => (
@@ -84,14 +84,6 @@ export default function UtilsPage() {
                     </li>
                   ))}
                 </ul>
-              </div>
-
-              {/* Stats */}
-              <div className="border-t border-gray-100 pt-4">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Recently used</span>
-                  <span className="text-gray-800 font-medium">2 hours ago</span>
-                </div>
               </div>
             </div>
           </div>
