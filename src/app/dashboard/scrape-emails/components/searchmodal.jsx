@@ -1,182 +1,234 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { FaSearch, FaSpinner, FaLink, FaList } from 'react-icons/fa'
 import { MdClose } from 'react-icons/md'
 import { useAuth } from '../../../components/AuthProvider'
 import { supabase } from '../../../lib/supabase'
 
 export default function SearchModal({ isOpen, onClose, onNewSearch }) {
-     const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const [searchName, setSearchName] = useState('')
   const [searchQueries, setSearchQueries] = useState('')
   const [urlList, setUrlList] = useState('')
   const [searchMethod, setSearchMethod] = useState('query') // 'query' or 'urls'
   const [isSearching, setIsSearching] = useState(false)
 
-
-const handleSubmit = async (e) => {
-  e.preventDefault()
-  if (!user) {
-    console.error('User not authenticated')
-    return
-  }
-
-  // Validation
-  if (!searchName.trim()) {
-    alert('Please enter a search name')
-    return
-  }
-  
-  if (searchMethod === 'query' && !searchQueries.trim()) {
-    alert('Please enter at least one search query')
-    return
-  }
-  
-  if (searchMethod === 'urls' && !urlList.trim()) {
-    alert('Please enter at least one URL')
-    return
-  }
-
-  setIsSearching(true)
-
-  const queries =
-    searchMethod === 'query'
-      ? searchQueries.split('\n').map(q => q.trim()).filter(Boolean)
-      : null
-
-  const urls =
-    searchMethod === 'urls'
-      ? urlList.split('\n').map(u => u.trim()).filter(Boolean)
-      : null
-
-  let scrappingId = null
-
-  try {
-    // Step 1: Save to database
-    const { data, error: dbError } = await supabase
-      .from('scrappings')
-      .insert({
-        user_id: user.id,
-        name: searchName,
-        method: searchMethod,
-        queries,
-        urls,
-        status: 'pending'
-      })
-      .select()
-      .single()
-
-    if (dbError) {
-      console.error('Database error:', dbError)
-      throw new Error(`Database error: ${dbError.message}`)
-    }
-
-    scrappingId = data.id
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    if (!session) {
-      throw new Error('Your session has expired. Please sign in again.')
-    }
-
-    // Step 2: Call the API route to start the scrapping process
-    const response = await fetch('/api/scrappings/start-scrapping', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        scrapping: {
-          id: data.id,
-          user_id: data.user_id,
-          method: data.method,
-          queries: data.queries,
-          urls: data.urls,
-          name: data.name
-        }
-      }),
-    })
-
-    // First check if the response is OK
-    if (!response.ok) {
-      // Try to get error text (might be HTML or JSON)
-      const errorText = await response.text()
-      console.error('API Error Response:', errorText)
-      
-      // Try to parse as JSON if it looks like JSON
-      let errorData = {}
-      try {
-        errorData = JSON.parse(errorText)
-      } catch {
-        // If not JSON, it's probably HTML
-        errorData = { message: `HTTP ${response.status}: ${response.statusText}` }
-      }
-      
-      throw new Error(`API failed: ${response.status} - ${errorData.message || errorData.error || 'Unknown error'}`)
-    }
-
-    // If response is OK, try to parse as JSON
-    let apiResult = {}
+  // Helper function to extract domain from URL
+  const extractDomain = (url) => {
     try {
-      apiResult = await response.json()
-      console.log('Scrapping process started:', apiResult)
-    } catch (jsonError) {
-      console.warn('Response was OK but not JSON:', jsonError)
-      // This is fine, the API might return success without body
-      apiResult = { success: true }
+      // Remove protocol and www prefix
+      const domain = url.toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '')
+      // Extract domain (e.g., example.com from https://www.example.com/path)
+      const match = domain.match(/^([^\/?#]+)/)
+      return match ? match[1] : url
+    } catch {
+      return url
     }
-
-    // Step 3: Update status to processing
-    const { error: updateError } = await supabase
-      .from('scrappings')
-      .update({ 
-        status: 'processing',
-        started_at: new Date().toISOString()
-      })
-      .eq('id', data.id)
-
-    if (updateError) {
-      console.error('Failed to update status:', updateError)
-    }
-
-    // Step 4: Notify parent component
-    if (onNewSearch) {
-      const updatedData = {
-        ...data,
-        status: 'processing',
-        started_at: new Date().toISOString()
-      }
-      onNewSearch(updatedData)
-    }
-
-    resetForm()
-    onClose()
-
-  } catch (error) {
-    console.error('Scrapping creation failed:', error)
-    
-    // Update the scrapping status to failed if we have an ID
-    if (scrappingId) {
-      try {
-        await supabase
-          .from('scrappings')
-          .update({ 
-            status: 'failed',
-            error: error.message || 'Unknown error'
-          })
-          .eq('id', scrappingId)
-      } catch (updateError) {
-        console.error('Failed to update failed status:', updateError)
-      }
-    }
-    
-    // Show error to user
-    alert(`Failed to start scrapping: ${error.message}`)
-  } finally {
-    setIsSearching(false)
   }
-}
+
+  // Deduplicate URLs by domain
+  const deduplicateUrlsByDomain = (urls) => {
+    const seenDomains = new Set()
+    const uniqueUrls = []
+    const duplicateDomains = []
+    
+    urls.forEach(url => {
+      const domain = extractDomain(url)
+      if (!seenDomains.has(domain)) {
+        seenDomains.add(domain)
+        uniqueUrls.push(url)
+      } else {
+        duplicateDomains.push(domain)
+      }
+    })
+    
+    return { uniqueUrls, duplicateDomains, totalDuplicates: urls.length - uniqueUrls.length }
+  }
+
+  // Process and deduplicate URLs as user types
+  const processedUrls = useMemo(() => {
+    const urls = urlList.split('\n').map(u => u.trim()).filter(Boolean)
+    return deduplicateUrlsByDomain(urls)
+  }, [urlList])
+
+  // Handle URL list input with deduplication
+  const handleUrlListChange = (value) => {
+    setUrlList(value)
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!user) {
+      console.error('User not authenticated')
+      return
+    }
+
+    // Validation
+    if (!searchName.trim()) {
+      alert('Please enter a search name')
+      return
+    }
+    
+    if (searchMethod === 'query' && !searchQueries.trim()) {
+      alert('Please enter at least one search query')
+      return
+    }
+    
+    if (searchMethod === 'urls' && !urlList.trim()) {
+      alert('Please enter at least one URL')
+      return
+    }
+
+    // Additional validation for URLs
+    if (searchMethod === 'urls') {
+      const urls = urlList.split('\n').map(u => u.trim()).filter(Boolean)
+      const invalidUrls = urls.filter(url => !url.match(/^https?:\/\//))
+      
+      if (invalidUrls.length > 0) {
+        alert(`Please ensure all URLs start with http:// or https://\nInvalid URLs: ${invalidUrls.slice(0, 3).join(', ')}${invalidUrls.length > 3 ? '...' : ''}`)
+        return
+      }
+    }
+
+    setIsSearching(true)
+
+    const queries =
+      searchMethod === 'query'
+        ? searchQueries.split('\n').map(q => q.trim()).filter(Boolean)
+        : null
+
+    // Use deduplicated URLs for processing
+    const urls =
+      searchMethod === 'urls'
+        ? processedUrls.uniqueUrls
+        : null
+
+    let scrappingId = null
+
+    try {
+      // Step 1: Save to database
+      const { data, error: dbError } = await supabase
+        .from('scrappings')
+        .insert({
+          user_id: user.id,
+          name: searchName,
+          method: searchMethod,
+          queries,
+          urls,
+          status: 'pending',
+          // Store metadata about deduplication
+          metadata: searchMethod === 'urls' ? {
+            total_urls_submitted: urlList.split('\n').filter(u => u.trim()).length,
+            unique_domains_processed: processedUrls.uniqueUrls.length,
+            duplicate_domains_removed: processedUrls.totalDuplicates
+          } : null
+        })
+        .select()
+        .single()
+
+      if (dbError) {
+        console.error('Database error:', dbError)
+        throw new Error(`Database error: ${dbError.message}`)
+      }
+
+      scrappingId = data.id
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        throw new Error('Your session has expired. Please sign in again.')
+      }
+
+      // Step 2: Call the API route to start the scrapping process
+      const response = await fetch('/api/scrappings/start-scrapping', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          scrapping: {
+            id: data.id,
+            user_id: data.user_id,
+            method: data.method,
+            queries: data.queries,
+            urls: data.urls,
+            name: data.name
+          }
+        }),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('API Error Response:', errorText)
+        
+        let errorData = {}
+        try {
+          errorData = JSON.parse(errorText)
+        } catch {
+          errorData = { message: `HTTP ${response.status}: ${response.statusText}` }
+        }
+        
+        throw new Error(`API failed: ${response.status} - ${errorData.message || errorData.error || 'Unknown error'}`)
+      }
+
+      let apiResult = {}
+      try {
+        apiResult = await response.json()
+        console.log('Scrapping process started:', apiResult)
+      } catch (jsonError) {
+        console.warn('Response was OK but not JSON:', jsonError)
+        apiResult = { success: true }
+      }
+
+      // Step 3: Update status to processing
+      const { error: updateError } = await supabase
+        .from('scrappings')
+        .update({ 
+          status: 'processing',
+          started_at: new Date().toISOString()
+        })
+        .eq('id', data.id)
+
+      if (updateError) {
+        console.error('Failed to update status:', updateError)
+      }
+
+      // Step 4: Notify parent component
+      if (onNewSearch) {
+        const updatedData = {
+          ...data,
+          status: 'processing',
+          started_at: new Date().toISOString()
+        }
+        onNewSearch(updatedData)
+      }
+
+      resetForm()
+      onClose()
+
+    } catch (error) {
+      console.error('Scrapping creation failed:', error)
+      
+      if (scrappingId) {
+        try {
+          await supabase
+            .from('scrappings')
+            .update({ 
+              status: 'failed',
+              error: error.message || 'Unknown error'
+            })
+            .eq('id', scrappingId)
+        } catch (updateError) {
+          console.error('Failed to update failed status:', updateError)
+        }
+      }
+      
+      alert(`Failed to start scrapping: ${error.message}`)
+    } finally {
+      setIsSearching(false)
+    }
+  }
 
   const resetForm = () => {
     setSearchName('')
@@ -281,8 +333,6 @@ law firms boston"
                     Each line will be processed as a separate search query
                   </p>
                 </div>
-
-               
               </div>
             )}
 
@@ -296,27 +346,48 @@ law firms boston"
                   <div className="relative">
                     <textarea
                       value={urlList}
-                      onChange={(e) => setUrlList(e.target.value)}
+                      onChange={(e) => handleUrlListChange(e.target.value)}
                       placeholder="https://examplecompany.com
-https://anotherbusiness.com
-https://startupwebsite.org
-https://localrestaurant.com
-https://consultingfirm.net"
+https://www.anotherbusiness.com
+https://subdomain.startupwebsite.org
+http://localrestaurant.com
+https://consultingfirm.net/about"
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 h-40 font-mono text-sm resize-none transition-colors"
                       required
                     />
                     <div className="absolute top-3 right-3 flex items-center gap-2">
-                      <div className="bg-purple-100 text-purple-800 text-xs font-medium px-2 py-1 rounded-full">
-                        {urlList.split('\n').filter(url => url.trim()).length} URLs
+                      <div className={`text-xs font-medium px-2 py-1 rounded-full ${
+                        processedUrls.totalDuplicates > 0 
+                          ? 'bg-amber-100 text-amber-800' 
+                          : 'bg-purple-100 text-purple-800'
+                      }`}>
+                        {processedUrls.uniqueUrls.length} unique domains
+                        {processedUrls.totalDuplicates > 0 && (
+                          <span className="ml-1">({processedUrls.totalDuplicates} duplicates removed)</span>
+                        )}
                       </div>
                     </div>
                   </div>
+                  
+                  {/* Duplicate domains warning */}
+                  {processedUrls.duplicateDomains.length > 0 && (
+                    <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-md">
+                      <p className="text-xs text-amber-800 font-medium">
+                        ⚠️ {processedUrls.totalDuplicates} duplicate domain{processedUrls.totalDuplicates > 1 ? 's' : ''} removed:
+                      </p>
+                      <p className="text-xs text-amber-700 truncate">
+                        {processedUrls.duplicateDomains.slice(0, 3).join(', ')}
+                        {processedUrls.duplicateDomains.length > 3 && `... (${processedUrls.duplicateDomains.length - 3} more)`}
+                      </p>
+                    </div>
+                  )}
+                  
                   <p className="text-xs text-gray-500 mt-2">
-                    Each line must be a complete URL starting with https:// or http://
+                    Each line must be a complete URL starting with https:// or http://. 
+                    <br />
+                    Duplicate domains will be automatically removed (e.g., https://example.com and https://www.example.com are considered the same domain).
                   </p>
                 </div>
-
-             
               </div>
             )}
 
@@ -334,7 +405,7 @@ https://consultingfirm.net"
                 type="submit"
                 disabled={isSearching || !searchName.trim() || 
                   (searchMethod === 'query' && !searchQueries.trim()) ||
-                  (searchMethod === 'urls' && !urlList.trim())}
+                  (searchMethod === 'urls' && processedUrls.uniqueUrls.length === 0)}
                 className="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-teal-600 to-teal-700 rounded-lg hover:from-teal-700 hover:to-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 shadow-md hover:shadow-lg"
               >
                 {isSearching ? (
@@ -352,7 +423,7 @@ https://consultingfirm.net"
                     ) : (
                       <>
                         <FaLink />
-                        Process {urlList.split('\n').filter(u => u.trim()).length} URLs
+                        Process {processedUrls.uniqueUrls.length} Unique Domain{processedUrls.uniqueUrls.length !== 1 ? 's' : ''}
                       </>
                     )}
                   </>
