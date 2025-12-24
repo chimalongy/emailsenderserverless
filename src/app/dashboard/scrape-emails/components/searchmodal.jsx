@@ -32,7 +32,7 @@ export default function SearchModal({ isOpen, onClose, onNewSearch }) {
     const seenDomains = new Set()
     const uniqueUrls = []
     const duplicateDomains = []
-    
+
     urls.forEach(url => {
       const domain = extractDomain(url)
       if (!seenDomains.has(domain)) {
@@ -42,7 +42,7 @@ export default function SearchModal({ isOpen, onClose, onNewSearch }) {
         duplicateDomains.push(domain)
       }
     })
-    
+
     return { uniqueUrls, duplicateDomains, totalDuplicates: urls.length - uniqueUrls.length }
   }
 
@@ -69,12 +69,12 @@ export default function SearchModal({ isOpen, onClose, onNewSearch }) {
       alert('Please enter a search name')
       return
     }
-    
+
     if (searchMethod === 'query' && !searchQueries.trim()) {
       alert('Please enter at least one search query')
       return
     }
-    
+
     if (searchMethod === 'urls' && !urlList.trim()) {
       alert('Please enter at least one URL')
       return
@@ -84,7 +84,7 @@ export default function SearchModal({ isOpen, onClose, onNewSearch }) {
     if (searchMethod === 'urls') {
       const urls = urlList.split('\n').map(u => u.trim()).filter(Boolean)
       const invalidUrls = urls.filter(url => !url.match(/^https?:\/\//))
-      
+
       if (invalidUrls.length > 0) {
         alert(`Please ensure all URLs start with http:// or https://\nInvalid URLs: ${invalidUrls.slice(0, 3).join(', ')}${invalidUrls.length > 3 ? '...' : ''}`)
         return
@@ -134,41 +134,73 @@ export default function SearchModal({ isOpen, onClose, onNewSearch }) {
 
       scrappingId = data.id
       const { data: { session } } = await supabase.auth.getSession()
-      
+
       if (!session) {
         throw new Error('Your session has expired. Please sign in again.')
       }
 
+
+
+      console.log(data)
+      
       // Step 2: Call the API route to start the scrapping process
-      const response = await fetch('/api/scrappings/start-scrapping', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          scrapping: {
-            id: data.id,
-            user_id: data.user_id,
-            method: data.method,
-            queries: data.queries,
-            urls: data.urls,
-            name: data.name
-          }
-        }),
-      })
+      let response;
+      const endpoint =
+        searchMethod === 'query'
+          ? '/api/scrappings/start-query-scrapping'
+          : '/api/scrappings/start-link-scrapping'
+
+      if (data.method = "url") {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            scrapping: {
+              id: data.id,
+              user_id: data.user_id,
+              method: data.method,
+              queries: data.queries,
+              urls: data.urls,
+              name: data.name
+            }
+          }),
+        })
+      }
+      else if (data.method = "query") {
+
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            scrapping: {
+              id: data.id,
+              user_id: data.user_id,
+              method: data.method,
+              queries: data.queries,
+              urls: data.urls,
+              name: data.name,
+            },
+          }),
+        })
+      }
 
       if (!response.ok) {
         const errorText = await response.text()
         console.error('API Error Response:', errorText)
-        
+
         let errorData = {}
         try {
           errorData = JSON.parse(errorText)
         } catch {
           errorData = { message: `HTTP ${response.status}: ${response.statusText}` }
         }
-        
+
         throw new Error(`API failed: ${response.status} - ${errorData.message || errorData.error || 'Unknown error'}`)
       }
 
@@ -184,7 +216,7 @@ export default function SearchModal({ isOpen, onClose, onNewSearch }) {
       // Step 3: Update status to processing
       const { error: updateError } = await supabase
         .from('scrappings')
-        .update({ 
+        .update({
           status: 'processing',
           started_at: new Date().toISOString()
         })
@@ -209,12 +241,12 @@ export default function SearchModal({ isOpen, onClose, onNewSearch }) {
 
     } catch (error) {
       console.error('Scrapping creation failed:', error)
-      
+
       if (scrappingId) {
         try {
           await supabase
             .from('scrappings')
-            .update({ 
+            .update({
               status: 'failed',
               error: error.message || 'Unknown error'
             })
@@ -223,7 +255,7 @@ export default function SearchModal({ isOpen, onClose, onNewSearch }) {
           console.error('Failed to update failed status:', updateError)
         }
       }
-      
+
       alert(`Failed to start scrapping: ${error.message}`)
     } finally {
       setIsSearching(false)
@@ -264,11 +296,10 @@ export default function SearchModal({ isOpen, onClose, onNewSearch }) {
           <button
             type="button"
             onClick={() => setSearchMethod('query')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-all ${
-              searchMethod === 'query'
-                ? 'border-teal-600 text-teal-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-all ${searchMethod === 'query'
+              ? 'border-teal-600 text-teal-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
           >
             <FaSearch className="h-4 w-4" />
             Search by Queries
@@ -276,11 +307,10 @@ export default function SearchModal({ isOpen, onClose, onNewSearch }) {
           <button
             type="button"
             onClick={() => setSearchMethod('urls')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-all ${
-              searchMethod === 'urls'
-                ? 'border-teal-600 text-teal-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-all ${searchMethod === 'urls'
+              ? 'border-teal-600 text-teal-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
           >
             <FaLink className="h-4 w-4" />
             Add URL List
@@ -356,11 +386,10 @@ https://consultingfirm.net/about"
                       required
                     />
                     <div className="absolute top-3 right-3 flex items-center gap-2">
-                      <div className={`text-xs font-medium px-2 py-1 rounded-full ${
-                        processedUrls.totalDuplicates > 0 
-                          ? 'bg-amber-100 text-amber-800' 
-                          : 'bg-purple-100 text-purple-800'
-                      }`}>
+                      <div className={`text-xs font-medium px-2 py-1 rounded-full ${processedUrls.totalDuplicates > 0
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-purple-100 text-purple-800'
+                        }`}>
                         {processedUrls.uniqueUrls.length} unique domains
                         {processedUrls.totalDuplicates > 0 && (
                           <span className="ml-1">({processedUrls.totalDuplicates} duplicates removed)</span>
@@ -368,7 +397,7 @@ https://consultingfirm.net/about"
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Duplicate domains warning */}
                   {processedUrls.duplicateDomains.length > 0 && (
                     <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-md">
@@ -381,9 +410,9 @@ https://consultingfirm.net/about"
                       </p>
                     </div>
                   )}
-                  
+
                   <p className="text-xs text-gray-500 mt-2">
-                    Each line must be a complete URL starting with https:// or http://. 
+                    Each line must be a complete URL starting with https:// or http://.
                     <br />
                     Duplicate domains will be automatically removed (e.g., https://example.com and https://www.example.com are considered the same domain).
                   </p>
@@ -403,7 +432,7 @@ https://consultingfirm.net/about"
               </button>
               <button
                 type="submit"
-                disabled={isSearching || !searchName.trim() || 
+                disabled={isSearching || !searchName.trim() ||
                   (searchMethod === 'query' && !searchQueries.trim()) ||
                   (searchMethod === 'urls' && processedUrls.uniqueUrls.length === 0)}
                 className="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-teal-600 to-teal-700 rounded-lg hover:from-teal-700 hover:to-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 shadow-md hover:shadow-lg"

@@ -16,7 +16,10 @@ import {
   FaChevronDown,
   FaHome,
   FaChevronRight,
-  FaSearch
+  FaSearch,
+  FaTools,
+  FaFilter,
+  FaGlobe
 } from 'react-icons/fa'
 
 export default function DashboardLayout({ children }) {
@@ -116,6 +119,24 @@ export default function DashboardLayout({ children }) {
       icon: <FaSearch className="w-5 h-5" />,
       description: 'Find and scrape email addresses'
     },
+    { 
+      name: 'Utils', 
+      href: '/dashboard/utils', 
+      icon: <FaTools className="w-5 h-5" />,
+      description: 'Tools and utilities'
+    },
+    { 
+      name: 'Dedupe List', 
+      href: '/dashboard/utils/dedupe', 
+      icon: <FaFilter className="w-5 h-5" />,
+      description: 'Remove duplicates and normalize lists'
+    },
+    { 
+      name: 'Domain Check', 
+      href: '/dashboard/utils/domain-check', 
+      icon: <FaGlobe className="w-5 h-5" />,
+      description: 'Check domain registration status'
+    },
   ]
 
   const userNavigation = [
@@ -128,7 +149,10 @@ export default function DashboardLayout({ children }) {
     if (pathname === '/dashboard/outbounds') return 'Campaigns'
     if (pathname === '/dashboard/settings') return 'Settings'
     if (pathname === '/dashboard/scrape-emails') return 'Scrape Emails'
-    return pathname.split('/').pop()?.replace('-', ' ') || ''
+    if (pathname === '/dashboard/utils') return 'Utils'
+    if (pathname === '/dashboard/utils/dedupe') return 'Dedupe List'
+    if (pathname === '/dashboard/utils/domain-check') return 'Domain Check'
+    return pathname.split('/').pop()?.replace(/-/g, ' ') || ''
   }
 
   return (
@@ -397,6 +421,9 @@ export default function DashboardLayout({ children }) {
                   {pathname === '/dashboard/outbounds' && 'Create and manage your outreach campaigns'}
                   {pathname === '/dashboard/settings' && 'Manage your account settings'}
                   {pathname === '/dashboard/scrape-emails' && 'Find and scrape email addresses for your campaigns'}
+                  {pathname === '/dashboard/utils' && 'Tools and utilities to enhance your workflow'}
+                  {pathname === '/dashboard/utils/dedupe' && 'Remove duplicates and normalize lists'}
+                  {pathname === '/dashboard/utils/domain-check' && 'Check domain registration status'}
                 </p>
               </div>
               
@@ -413,14 +440,29 @@ export default function DashboardLayout({ children }) {
                     </Link>
                   </li>
                   {pathname !== '/dashboard' && (
-                    <li>
-                      <div className="flex items-center">
-                        <FaChevronRight className="h-3 w-3 text-gray-400 mx-1" />
-                        <span className="text-gray-800 font-medium">
-                          {getPageTitle()}
-                        </span>
-                      </div>
-                    </li>
+                    <>
+                      {(pathname === '/dashboard/utils/dedupe' || pathname === '/dashboard/utils/domain-check') && (
+                        <li>
+                          <div className="flex items-center">
+                            <FaChevronRight className="h-3 w-3 text-gray-400 mx-1" />
+                            <Link
+                              href="/dashboard/utils"
+                              className="text-gray-500 hover:text-gray-700"
+                            >
+                              Utils
+                            </Link>
+                          </div>
+                        </li>
+                      )}
+                      <li>
+                        <div className="flex items-center">
+                          <FaChevronRight className="h-3 w-3 text-gray-400 mx-1" />
+                          <span className="text-gray-800 font-medium">
+                            {getPageTitle()}
+                          </span>
+                        </div>
+                      </li>
+                    </>
                   )}
                 </ol>
               </nav>
