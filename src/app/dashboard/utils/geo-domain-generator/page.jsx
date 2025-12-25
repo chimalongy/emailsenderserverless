@@ -785,14 +785,9 @@ export default function GeoDomainGenerator() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-2 sm:p-3">
+    <div className="min-h-screen p-2 sm:p-3">
       <div className="max-w-6xl mx-auto">
-        <div className="mb-4 sm:mb-6">
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Geo Domain Generator</h1>
-          <p className="text-gray-600 text-xs sm:text-sm">
-            Generate service+location or location+service domain combinations
-          </p>
-        </div>
+       
 
         {/* Availability Stats - Responsive Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-4">

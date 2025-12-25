@@ -45,15 +45,9 @@ export default function UtilsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Utilities</h1>
-        <p className="text-gray-600 mt-2">
-          Tools to help you manage and optimize your data and domains
-        </p>
-      </div>
-
-      {/* Tabs */}
+     
+     
+      {/* Tabs 
       <div className="border-b border-teal-100">
         <nav className="-mb-px flex space-x-8">
           {['overview', 'recent', 'favorites'].map((tab) => (
@@ -72,7 +66,7 @@ export default function UtilsPage() {
             </button>
           ))}
         </nav>
-      </div>
+      </div> */}
 
       {/* Tools Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

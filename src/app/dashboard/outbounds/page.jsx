@@ -338,17 +338,7 @@ export default function OutboundsPage() {
       {/* Header - Mobile Optimized */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-teal-500 rounded-lg">
-              <TbMailForward className="h-4 w-4 text-white" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-gray-800">Campaigns</h1>
-              <p className="text-gray-500 text-xs">
-                Manage email outreach
-              </p>
-            </div>
-          </div>
+         
           
           <div className="flex items-center gap-1">
             <button

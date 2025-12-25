@@ -489,10 +489,7 @@ export default function ScrapeEmailsPage() {
         {/* Header */}
         <div className="mb-4 sm:mb-6">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-            <div className="flex-1 min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">Email Finder</h1>
-              <p className="text-gray-600 text-xs sm:text-sm mt-1">Search, collect, and manage business emails</p>
-            </div>
+         
             <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
               <button
                 onClick={handleRetryFetch}
