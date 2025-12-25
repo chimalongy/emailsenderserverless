@@ -6,7 +6,8 @@ import {
   FaFilter, 
   FaGlobe, 
   FaArrowRight, 
-  FaCheckCircle
+  FaCheckCircle,
+  FaMapMarkerAlt
 } from 'react-icons/fa'
 
 export default function UtilsPage() {
@@ -20,7 +21,7 @@ export default function UtilsPage() {
       icon: <FaFilter className="w-6 h-6" />,
       href: '/dashboard/utils/dedupe',
       features: ['Remove duplicates', 'Case normalization', 'Whitespace trimming', 'CSV export'],
-      color: 'from-blue-500 to-cyan-500'
+      color: 'bg-teal-400'
     },
     {
       id: 'domain-check',
@@ -29,38 +30,68 @@ export default function UtilsPage() {
       icon: <FaGlobe className="w-6 h-6" />,
       href: '/dashboard/utils/domain-check',
       features: ['Registration status', 'WHOIS lookup', 'Bulk checking', 'Export results'],
-      color: 'from-green-500 to-emerald-500'
+      color: 'bg-teal-500'
+    },
+    {
+      id: 'geo-domain',
+      name: 'Geo Domain Generator',
+      description: 'Generate geo-targeted domain names for specific locations',
+      icon: <FaMapMarkerAlt className="w-6 h-6" />,
+      href: '/dashboard/utils/geo-domain-generator',
+      features: ['City-based domains', 'Country TLD suggestions', 'Location keywords', 'Availability check'],
+      color: 'bg-teal-600'
     }
   ]
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      {/* <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-800 mb-3">Utility Tools</h1>
-        <p className="text-gray-600 max-w-2xl mx-auto">
-          Powerful tools to streamline your workflow. Process lists, check domains, and automate repetitive tasks.
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900">Utilities</h1>
+        <p className="text-gray-600 mt-2">
+          Tools to help you manage and optimize your data and domains
         </p>
-      </div> */}
+      </div>
+
+      {/* Tabs */}
+      <div className="border-b border-teal-100">
+        <nav className="-mb-px flex space-x-8">
+          {['overview', 'recent', 'favorites'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`
+                py-2 px-1 border-b-2 font-medium text-sm
+                ${activeTab === tab
+                  ? 'border-teal-500 text-teal-600'
+                  : 'border-transparent text-gray-500 hover:text-teal-700 hover:border-teal-300'
+                }
+              `}
+            >
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
+        </nav>
+      </div>
 
       {/* Tools Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {tools.map((tool) => (
           <div 
             key={tool.id} 
-            className="bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-all duration-200 hover:shadow-lg"
+            className="bg-white rounded-xl border border-teal-100 hover:border-teal-200 transition-all duration-200 hover:shadow-md"
           >
             <div className="p-6">
               {/* Tool Header */}
               <div className="flex items-start justify-between mb-4">
-                <div className={`p-3 rounded-lg bg-gradient-to-br ${tool.color}`}>
+                <div className={`p-3 rounded-lg ${tool.color}`}>
                   <div className="text-white">
                     {tool.icon}
                   </div>
                 </div>
                 <Link
                   href={tool.href}
-                  className="inline-flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg text-sm font-medium transition-colors"
+                  className="inline-flex items-center px-4 py-2 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-lg text-sm font-medium transition-colors border border-teal-200"
                 >
                   Open Tool
                   <FaArrowRight className="ml-2 h-3 w-3" />
@@ -75,11 +106,11 @@ export default function UtilsPage() {
 
               {/* Features */}
               <div className="mb-2">
-                <h4 className="text-sm font-semibold text-gray-700 mb-2 uppercase tracking-wider">Features</h4>
+                <h4 className="text-sm font-semibold text-teal-700 mb-2 uppercase tracking-wider">Features</h4>
                 <ul className="space-y-1">
                   {tool.features.map((feature, index) => (
                     <li key={index} className="flex items-center text-sm text-gray-600">
-                      <FaCheckCircle className="h-3 w-3 text-green-500 mr-2" />
+                      <FaCheckCircle className="h-3 w-3 text-teal-500 mr-2" />
                       {feature}
                     </li>
                   ))}
