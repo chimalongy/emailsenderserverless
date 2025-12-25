@@ -116,7 +116,8 @@ export default function ScrapeDetailsPage() {
         processed.push({
           ...item,
           uniqueId,
-          originalIndex: index
+          originalIndex: index,
+          serialNumber: index + 1 // Add serial number
         })
       }
     })
@@ -222,7 +223,7 @@ export default function ScrapeDetailsPage() {
         return item
       })
       
-      const dataForSupabase = updatedData.map(({ uniqueId, originalIndex, ...rest }) => rest)
+      const dataForSupabase = updatedData.map(({ uniqueId, originalIndex, serialNumber, ...rest }) => rest)
       
       const { error } = await supabase
         .from('scrappings')
@@ -264,7 +265,7 @@ export default function ScrapeDetailsPage() {
         return item
       })
       
-      const dataForSupabase = updatedData.map(({ uniqueId, originalIndex, ...rest }) => rest)
+      const dataForSupabase = updatedData.map(({ uniqueId, originalIndex, serialNumber, ...rest }) => rest)
       
       const { error } = await supabase
         .from('scrappings')
@@ -296,7 +297,7 @@ export default function ScrapeDetailsPage() {
     try {
       const updatedData = scrapedData.filter(item => item.uniqueId !== uniqueId)
       
-      const dataForSupabase = updatedData.map(({ uniqueId, originalIndex, ...rest }) => rest)
+      const dataForSupabase = updatedData.map(({ uniqueId, originalIndex, serialNumber, ...rest }) => rest)
       
       const { error } = await supabase
         .from('scrappings')
@@ -368,8 +369,9 @@ export default function ScrapeDetailsPage() {
       return
     }
 
-    const headers = ['Email', 'Source']
-    const csvRows = allEmails.map(({ email, source }) => [
+    const headers = ['S/N', 'Email', 'Source']
+    const csvRows = allEmails.map(({ email, source }, index) => [
+      index + 1,
       email || '',
       source || ''
     ])
@@ -696,13 +698,16 @@ export default function ScrapeDetailsPage() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
+                    <th className="px-3 sm:px-4 lg:px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12 sm:w-16">
+                      S/N
+                    </th>
                     <th className="px-3 sm:px-4 lg:px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Source URL
                     </th>
-                    <th className="px-3 sm:px-4 lg:px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="hidden sm:table-cell px-4 lg:px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Emails
                     </th>
-                    <th className="px-3 sm:px-4 lg:px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="hidden sm:table-cell px-4 lg:px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
@@ -716,35 +721,108 @@ export default function ScrapeDetailsPage() {
                     return (
                       <React.Fragment key={item.uniqueId}>
                         <tr className="hover:bg-gray-50">
-                          <td className="px-3 sm:px-4 lg:px-6 py-3">
-                            <div className="flex items-center min-w-0">
-                              <button
-                                onClick={() => toggleSourceExpansion(item.uniqueId)}
-                                className="mr-2 text-gray-400 hover:text-gray-600 flex-shrink-0"
-                              >
-                                {isExpanded ? (
-                                  <FaChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
-                                ) : (
-                                  <FaChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
-                                )}
-                              </button>
-                              <div className="flex-1 min-w-0">
-                                <a 
-                                  href={item.link_scraped} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="text-xs sm:text-sm font-medium text-teal-600 hover:text-teal-800 truncate block"
-                                  title={item.link_scraped}
-                                >
-                                  {truncateUrl(item.link_scraped, 35)}
-                                </a>
-                                <div className="text-xs text-gray-500 mt-0.5 truncate">
-                                  {emailCount} email{emailCount !== 1 ? 's' : ''}
-                                </div>
-                              </div>
+                          <td className="px-3 sm:px-4 lg:px-6 py-3 align-top">
+                            <div className="text-xs sm:text-sm font-medium text-gray-500">
+                              {item.serialNumber}.
                             </div>
                           </td>
                           <td className="px-3 sm:px-4 lg:px-6 py-3">
+                            <div className="min-w-0">
+                              {/* Mobile View: Link and actions together */}
+                              <div className="sm:hidden mb-2">
+                                <div className="flex items-center justify-between">
+                                  <button
+                                    onClick={() => toggleSourceExpansion(item.uniqueId)}
+                                    className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+                                  >
+                                    {isExpanded ? (
+                                      <FaChevronDown className="h-3 w-3" />
+                                    ) : (
+                                      <FaChevronRight className="h-3 w-3" />
+                                    )}
+                                  </button>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => startAddEmail(item.uniqueId)}
+                                      className="text-teal-600 hover:text-teal-900 p-1"
+                                      title="Add email"
+                                    >
+                                      <FaPlus className="h-3 w-3" />
+                                    </button>
+                                    <button
+                                      onClick={() => copyToClipboard(item.link_scraped, 'URL copied!')}
+                                      className="text-blue-600 hover:text-blue-900 p-1"
+                                      title="Copy URL"
+                                    >
+                                      <FaCopy className="h-3 w-3" />
+                                    </button>
+                                    <button
+                                      onClick={() => deleteSource(item.uniqueId)}
+                                      className="text-red-600 hover:text-red-900 p-1"
+                                      title="Delete source"
+                                    >
+                                      <FaTrash className="h-3 w-3" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Link name */}
+                              <div className="flex items-center min-w-0">
+                                <div className="hidden sm:block">
+                                  <button
+                                    onClick={() => toggleSourceExpansion(item.uniqueId)}
+                                    className="mr-2 text-gray-400 hover:text-gray-600 flex-shrink-0"
+                                  >
+                                    {isExpanded ? (
+                                      <FaChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
+                                    ) : (
+                                      <FaChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                                    )}
+                                  </button>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <a 
+                                    href={item.link_scraped} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-xs sm:text-sm font-medium text-teal-600 hover:text-teal-800 truncate block"
+                                    title={item.link_scraped}
+                                  >
+                                    {truncateUrl(item.link_scraped, 35)}
+                                  </a>
+                                  <div className="text-xs text-gray-500 mt-0.5 truncate">
+                                    {emailCount} email{emailCount !== 1 ? 's' : ''}
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Mobile View: Email preview */}
+                              <div className="sm:hidden mt-2">
+                                {hasEmails ? (
+                                  <div className="flex items-center min-w-0">
+                                    <FaEnvelope className="mr-2 text-gray-400 h-3 w-3 flex-shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-xs text-gray-900 truncate" title={item.emails[0]}>
+                                        {truncateUrl(item.emails[0], 25)}
+                                      </div>
+                                      {emailCount > 1 && (
+                                        <div className="text-xs text-gray-500 truncate">
+                                          +{emailCount - 1} more
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center text-gray-400">
+                                    <FaEnvelope className="mr-2 h-3 w-3 flex-shrink-0" />
+                                    <span className="text-xs">No emails</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="hidden sm:table-cell px-4 lg:px-6 py-3">
                             {hasEmails ? (
                               <div className="flex items-center min-w-0">
                                 <FaEnvelope className="mr-2 text-gray-400 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
@@ -766,7 +844,7 @@ export default function ScrapeDetailsPage() {
                               </div>
                             )}
                           </td>
-                          <td className="px-3 sm:px-4 lg:px-6 py-3 whitespace-nowrap">
+                          <td className="hidden sm:table-cell px-4 lg:px-6 py-3 whitespace-nowrap">
                             <div className="flex items-center gap-1 sm:gap-2 justify-end">
                               <button
                                 onClick={() => startAddEmail(item.uniqueId)}
@@ -796,7 +874,7 @@ export default function ScrapeDetailsPage() {
                         {/* Expanded row for emails list */}
                         {isExpanded && (
                           <tr className="bg-gray-50">
-                            <td colSpan={3} className="px-3 sm:px-4 lg:px-6 py-3">
+                            <td colSpan={4} className="px-3 sm:px-4 lg:px-6 py-3">
                               <div className="pl-8 sm:pl-10 lg:pl-12">
                                 {/* Add email form */}
                                 {isAddingEmail === item.uniqueId && (
