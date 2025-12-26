@@ -197,7 +197,7 @@ async function getDomainMetrics(domain) {
    Google Safe Browsing Blacklist Check
 ------------------------- */
 async function checkBlacklist(domain) {
-  const apiKey = process.env.GOOGLE_SAFE_BROWSING_API_KEY || process.env.GOOGLE_SEARCH_API_KEY;
+  const apiKey = process.env.GOOGLE_SAFE_BROWSING_API_KEY 
   console.log(apiKey)
   
   if (!apiKey) {

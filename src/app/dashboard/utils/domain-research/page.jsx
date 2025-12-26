@@ -511,31 +511,8 @@ export default function DomainHistoryPage() {
                     )}
                   </div>
 
-                  {/* Security Recommendations */}
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <h5 className="font-semibold text-blue-800 text-sm mb-2 flex items-center gap-2">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                      </svg>
-                      Security Recommendations
-                    </h5>
-                    <ul className="text-xs text-blue-700 space-y-1">
-                      {data.security?.overallBlacklisted ? (
-                        <>
-                          <li>• Avoid visiting this domain in your browser</li>
-                          <li>• Do not download files from this domain</li>
-                          <li>• Consider it potentially malicious</li>
-                          <li>• Report suspicious activity to your IT department</li>
-                        </>
-                      ) : (
-                        <>
-                          <li>• Domain appears clean in security databases</li>
-                          <li>• Exercise normal caution when browsing</li>
-                          <li>• Keep your browser and security software updated</li>
-                        </>
-                      )}
-                    </ul>
-                  </div>
+                
+              
                 </div>
               </div>
 
