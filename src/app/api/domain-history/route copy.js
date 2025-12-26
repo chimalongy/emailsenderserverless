@@ -164,147 +164,6 @@ async function checkTLDAvailability(domain) {
 }
 
 /* -------------------------
-   Domain Metrics
-------------------------- */
-async function getDomainMetrics(domain) {
-  const length = domain.length;
-  const hasHyphen = domain.includes("-");
-  const hasNumber = /\d/.test(domain);
-  const words = domain.split(/[-.]/).filter(Boolean);
-  const wordCount = words.length;
-
-  function readabilityScore(domain) {
-    const vowels = domain.match(/[aeiou]/gi)?.length || 0;
-    const consonants = domain.match(/[bcdfghjklmnpqrstvwxyz]/gi)?.length || 0;
-    const ratio = vowels / (consonants || 1);
-    const syllables = words.reduce((acc, w) => acc + Math.ceil(w.length / 3), 0);
-    return Math.floor((ratio * 50) + (syllables * 10));
-  }
-  const pronounceabilityScore = readabilityScore(domain);
-
-  let mxRecords = [];
-  let aRecords = [];
-  let aaaaRecords = [];
-
-  try { mxRecords = (await dns.resolveMx(domain)).map(r => r.exchange.toLowerCase()); } catch {}
-  try { aRecords = await dns.resolve4(domain); } catch {}
-  try { aaaaRecords = await dns.resolve6(domain); } catch {}
-
-  return { length, wordCount, hasHyphen, hasNumber, pronounceabilityScore, mxRecords, aRecords, aaaaRecords };
-}
-
-/* -------------------------
-   Google Safe Browsing Blacklist Check
-------------------------- */
-async function checkBlacklist(domain) {
-  const apiKey = process.env.GOOGLE_SAFE_BROWSING_API_KEY || process.env.GOOGLE_SEARCH_API_KEY;
-  console.log(apiKey)
-  
-  if (!apiKey) {
-    console.warn("Google Safe Browsing API key not set");
-    return { 
-      blacklisted: false, 
-      detail: "API key not configured",
-      provider: "Google Safe Browsing"
-    };
-  }
-
-  const url = `https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${apiKey}`;
-  const payload = {
-    client: { 
-      clientId: "domain-checker", 
-      clientVersion: "1.0" 
-    },
-    threatInfo: {
-      threatTypes: ["MALWARE", "SOCIAL_ENGINEERING", "UNWANTED_SOFTWARE", "POTENTIALLY_HARMFUL_APPLICATION"],
-      platformTypes: ["ANY_PLATFORM"],
-      threatEntryTypes: ["URL"],
-      threatEntries: [{ url: `http://${domain}` }, { url: `https://${domain}` }]
-    }
-  };
-
-  try {
-    const res = await axios.post(url, payload, {
-      headers: { "Content-Type": "application/json" },
-      timeout: 5000
-    });
-    
-    if (res.data && res.data.matches && res.data.matches.length > 0) {
-      return { 
-        blacklisted: true, 
-        detail: res.data.matches,
-        provider: "Google Safe Browsing"
-      };
-    } else {
-      return { 
-        blacklisted: false, 
-        detail: null,
-        provider: "Google Safe Browsing"
-      };
-    }
-  } catch (err) {
-    console.error("Safe Browsing API error:", err.message);
-    return { 
-      blacklisted: false, 
-      detail: `API error: ${err.message}`,
-      provider: "Google Safe Browsing"
-    };
-  }
-}
-
-/* -------------------------
-   Additional Blacklist Checks (Optional)
-------------------------- */
-async function checkAdditionalBlacklists(domain) {
-  const blacklists = [
-    {
-      name: "PhishTank",
-      url: `https://checkphish.ai/api/neo/check?url=${encodeURIComponent(domain)}`,
-      enabled: false // Requires API key
-    },
-    {
-      name: "URLhaus",
-      url: `https://urlhaus-api.abuse.ch/v1/host/${domain}/`,
-      parse: (data) => data.query_status === "ok" && data.threat === "malware_download"
-    },
-    {
-      name: "Spamhaus DBL",
-      check: async () => {
-        try {
-          await dns.resolveTxt(`${domain}.dbl.spamhaus.org`);
-          return true;
-        } catch {
-          return false;
-        }
-      }
-    }
-  ];
-
-  const results = [];
-  
-  for (const list of blacklists) {
-    if (list.check) {
-      try {
-        const isListed = await list.check();
-        results.push({
-          name: list.name,
-          blacklisted: isListed,
-          detail: isListed ? "Listed" : "Not listed"
-        });
-      } catch (err) {
-        results.push({
-          name: list.name,
-          blacklisted: false,
-          detail: `Error: ${err.message}`
-        });
-      }
-    }
-  }
-
-  return results;
-}
-
-/* -------------------------
    API Route
 ------------------------- */
 export async function GET(req) {
@@ -373,7 +232,7 @@ export async function GET(req) {
     }
 
     /* -------------------------
-       Scoring (Updated with Blacklist)
+       Scoring
     ------------------------- */
     let score = 0;
     const breakdown = [];
@@ -401,36 +260,9 @@ export async function GET(req) {
       breakdown.push("-15 Previous drop detected");
     }
 
-    /* -------------------------
-       Blacklist Checks
-    ------------------------- */
-    const blacklistStatus = await checkBlacklist(domain);
-    const additionalBlacklists = await checkAdditionalBlacklists(domain);
-    
-    // Deduct points if blacklisted
-    if (blacklistStatus.blacklisted) {
-      score -= 40;
-      breakdown.push("-40 Blacklisted (Google Safe Browsing)");
-    }
-
-    // Check additional blacklists
-    const anyAdditionalBlacklisted = additionalBlacklists.some(list => list.blacklisted);
-    if (anyAdditionalBlacklisted) {
-      score -= 20;
-      breakdown.push("-20 Blacklisted (other security lists)");
-    }
-
-    /* -------------------------
-       Final Risk Label
-    ------------------------- */
     let riskLabel = "Risky";
     if (score >= 70) riskLabel = "Clean";
     else if (score >= 40) riskLabel = "Mixed";
-    
-    // Override to "High Risk" if blacklisted
-    if (blacklistStatus.blacklisted || anyAdditionalBlacklisted) {
-      riskLabel = "High Risk";
-    }
 
     /* -------------------------
        Registrar (FIXED)
@@ -442,14 +274,6 @@ export async function GET(req) {
     ------------------------- */
     const tldAvailability = await checkTLDAvailability(domain);
 
-    /* -------------------------
-       Domain Metrics
-    ------------------------- */
-    const domainMetrics = await getDomainMetrics(domain);
-
-    /* -------------------------
-       Response
-    ------------------------- */
     return NextResponse.json({
       domain,
       registrationStatus,
@@ -471,18 +295,10 @@ export async function GET(req) {
         allSnapshotsUrl
       },
 
-      security: {
-        googleSafeBrowsing: blacklistStatus,
-        additionalBlacklists,
-        overallBlacklisted: blacklistStatus.blacklisted || anyAdditionalBlacklisted
-      },
-
-      tldAvailability,
-      domainMetrics
+      tldAvailability
     });
 
-  } catch (err) {
-    console.error(err);
+  } catch {
     return NextResponse.json(
       { error: "Failed to fetch domain data" },
       { status: 500 }
