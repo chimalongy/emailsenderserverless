@@ -1,19 +1,17 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '../../../lib/supabase' // Adjust the import path as needed
+import { supabase } from '../../../lib/supabase'
 import { 
   FaSearch, FaCopy, FaDownload, FaRandom, FaGlobe, FaMapMarkerAlt, 
   FaChevronDown, FaChevronUp, FaSortAlphaDown, FaSortAlphaUp, FaSpinner,
   FaCheckCircle, FaTimesCircle, FaQuestionCircle, FaExclamationTriangle,
-  FaSync, FaClock, FaFilter, FaSort, FaEllipsisV
+  FaSync, FaClock, FaFilter, FaSort, FaEllipsisV, FaPlus, FaEdit, FaTrash
 } from 'react-icons/fa'
 
 const extensions = ['.com', '.net', '.org', '.co', '.us', '.biz', '.info']
 
-// ---------------------------
-// RDAP domain check (same as first component)
-// ---------------------------
+// RDAP domain check
 const rdapCheck = async (domain) => {
   try {
     const res = await fetch(`https://rdap.org/domain/${domain}`, {
@@ -45,23 +43,35 @@ const checkDomain = async (domain) => {
   }
 }
 
-// ---------------------------
-// React Component
-// ---------------------------
-
 export default function GeoDomainGenerator() {
+  // Core states
   const [states, setStates] = useState([])
   const [cities, setCities] = useState([])
   const [services, setServices] = useState([])
   const [loading, setLoading] = useState(true)
+  
+  // Selection states
   const [domainFormat, setDomainFormat] = useState('service+location')
   const [selectedLocationType, setSelectedLocationType] = useState('city')
   const [selectedLocation, setSelectedLocation] = useState('')
   const [selectedService, setSelectedService] = useState('')
   const [selectedExtension, setSelectedExtension] = useState('.com')
+  
+  // Custom input states
+  const [customLocationInput, setCustomLocationInput] = useState('')
+  const [customLocationAbbr, setCustomLocationAbbr] = useState('')
+  const [customServiceInput, setCustomServiceInput] = useState('')
+  const [showCustomLocationForm, setShowCustomLocationForm] = useState(false)
+  const [showCustomServiceForm, setShowCustomServiceForm] = useState(false)
+  const [customLocations, setCustomLocations] = useState([])
+  const [customServices, setCustomServices] = useState([])
+  
+  // Domain lists
   const [abbreviationDomains, setAbbreviationDomains] = useState([])
   const [fullNameDomains, setFullNameDomains] = useState([])
   const [selectedDomains, setSelectedDomains] = useState([])
+  
+  // UI states
   const [expandedSections, setExpandedSections] = useState({
     abbreviation: true,
     fullName: true
@@ -94,20 +104,37 @@ export default function GeoDomainGenerator() {
   // Fetch data from Supabase on component mount
   useEffect(() => {
     fetchGeoData()
+    // Load custom data from localStorage
+    const savedCustomLocations = localStorage.getItem('customLocations')
+    const savedCustomServices = localStorage.getItem('customServices')
+    
+    if (savedCustomLocations) {
+      setCustomLocations(JSON.parse(savedCustomLocations))
+    }
+    if (savedCustomServices) {
+      setCustomServices(JSON.parse(savedCustomServices))
+    }
   }, [])
+
+  // Save custom data to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('customLocations', JSON.stringify(customLocations))
+  }, [customLocations])
+
+  useEffect(() => {
+    localStorage.setItem('customServices', JSON.stringify(customServices))
+  }, [customServices])
 
   const fetchGeoData = async () => {
     try {
       setLoading(true)
       
-      // Fetch all data from geo_lists table
       const { data, error } = await supabase
         .from('geo_lists')
         .select('*')
       
       if (error) throw error
       
-      // Process data based on type
       const processedStates = []
       const processedCities = []
       const processedServices = []
@@ -115,7 +142,6 @@ export default function GeoDomainGenerator() {
       data.forEach(item => {
         switch (item.type) {
           case 'state':
-            // Parse JSON array from data column
             if (item.data && Array.isArray(item.data)) {
               item.data.forEach(state => {
                 processedStates.push({
@@ -127,7 +153,6 @@ export default function GeoDomainGenerator() {
             break
             
           case 'city':
-            // Parse JSON array from data column
             if (item.data && Array.isArray(item.data)) {
               item.data.forEach(city => {
                 processedCities.push({
@@ -139,7 +164,6 @@ export default function GeoDomainGenerator() {
             break
             
           case 'service':
-            // Parse JSON array from data column
             if (item.data && Array.isArray(item.data)) {
               processedServices.push(...item.data)
             }
@@ -153,37 +177,138 @@ export default function GeoDomainGenerator() {
       
     } catch (error) {
       console.error('Error fetching geo data:', error)
-      // Fallback to hardcoded data if fetch fails
-      setStates(fallbackStates)
-      setCities(fallbackCities)
-      setServices(fallbackServices)
+      // Fallback data
+      setStates([
+        { name: 'New York', abbr: 'NY' },
+        { name: 'California', abbr: 'CA' },
+        { name: 'Texas', abbr: 'TX' },
+        { name: 'Florida', abbr: 'FL' }
+      ])
+      setCities([
+        { name: 'New York City', abbr: 'NYC' },
+        { name: 'Los Angeles', abbr: 'LA' },
+        { name: 'Chicago', abbr: 'CHI' },
+        { name: 'Houston', abbr: 'HOU' }
+      ])
+      setServices([
+        'Plumber',
+        'Electrician',
+        'Cleaner',
+        'Contractor',
+        'Carpenter',
+        'Landscaper'
+      ])
     } finally {
       setLoading(false)
     }
   }
 
-  // Fallback data in case database fetch fails
-  const fallbackStates = []
-  const fallbackCities = []
-  const fallbackServices = []
+  // Combined location list (database + custom) - Updated to avoid duplicates
+  const getLocationList = () => {
+    const baseList = selectedLocationType === 'state' ? states : cities;
+    
+    // Combine base list with custom locations
+    const allLocations = [...baseList, ...customLocations.filter(loc => 
+      selectedLocationType === 'state' ? loc.type === 'state' : loc.type === 'city'
+    )];
+    
+    // Create a map to deduplicate by abbreviation, preferring custom entries
+    const locationMap = new Map();
+    
+    allLocations.forEach(location => {
+      const key = location.abbr;
+      const existing = locationMap.get(key);
+      
+      // If we don't have this abbreviation yet, or if this is a custom location
+      if (!existing || location.isCustom) {
+        locationMap.set(key, {
+          ...location,
+          // Ensure type is set for custom locations
+          type: location.type || (selectedLocationType === 'state' ? 'state' : 'city')
+        });
+      }
+    });
+    
+    // Convert back to array
+    return Array.from(locationMap.values());
+  }
 
-  const locationList = selectedLocationType === 'state' ? states : cities
+  // Combined service list (database + custom)
+  const getServiceList = () => {
+    return [...services, ...customServices]
+  }
+
+  const addCustomLocation = () => {
+    if (!customLocationInput.trim() || !customLocationAbbr.trim()) {
+      alert('Please enter both location name and abbreviation')
+      return
+    }
+
+    const newLocation = {
+      id: Date.now(),
+      name: customLocationInput.trim(),
+      abbr: customLocationAbbr.trim().toUpperCase(),
+      type: selectedLocationType,
+      isCustom: true
+    }
+
+    setCustomLocations(prev => [...prev, newLocation])
+    setSelectedLocation(newLocation.abbr)
+    setCustomLocationInput('')
+    setCustomLocationAbbr('')
+    setShowCustomLocationForm(false)
+  }
+
+  const addCustomService = () => {
+    if (!customServiceInput.trim()) {
+      alert('Please enter a service name')
+      return
+    }
+
+    const newService = customServiceInput.trim()
+    setCustomServices(prev => [...prev, newService])
+    setSelectedService(newService)
+    setCustomServiceInput('')
+    setShowCustomServiceForm(false)
+  }
+
+  const removeCustomLocation = (id) => {
+    setCustomLocations(prev => prev.filter(loc => loc.id !== id))
+    if (selectedLocation === customLocations.find(loc => loc.id === id)?.abbr) {
+      setSelectedLocation('')
+    }
+  }
+
+  const removeCustomService = (service) => {
+    setCustomServices(prev => prev.filter(s => s !== service))
+    if (selectedService === service) {
+      setSelectedService('')
+    }
+  }
 
   const generateDomains = () => {
-    if (loading || services.length === 0 || locationList.length === 0) {
+    if (loading) return
+
+    const locationList = getLocationList()
+    const serviceList = getServiceList()
+    
+    if (serviceList.length === 0 || locationList.length === 0) {
       return
     }
 
     const abbreviationDomainsList = []
     const fullNameDomainsList = []
     
+    // Helper function to create domain slug
+    const createSlug = (text) => text.toLowerCase().replace(/\s+/g, '')
+    
     if (selectedLocation && !selectedService) {
       const locationData = locationList.find(loc => loc.abbr === selectedLocation)
       
-      services.forEach(service => {
-        const serviceSlug = service.toLowerCase().replace(/\s+/g, '')
-        const locationAbbrSlug = selectedLocation.toLowerCase().replace(/\s+/g, '')
-        const locationFullSlug = locationData ? locationData.name.toLowerCase().replace(/\s+/g, '') : ''
+      serviceList.forEach(service => {
+        const serviceSlug = createSlug(service)
+        const locationAbbrSlug = createSlug(selectedLocation)
+        const locationFullSlug = locationData ? createSlug(locationData.name) : ''
         
         if (domainFormat === 'service+location') {
           abbreviationDomainsList.push({
@@ -223,9 +348,9 @@ export default function GeoDomainGenerator() {
       })
     } else if (selectedService && !selectedLocation) {
       locationList.forEach(location => {
-        const serviceSlug = selectedService.toLowerCase().replace(/\s+/g, '')
-        const locationAbbrSlug = location.abbr.toLowerCase().replace(/\s+/g, '')
-        const locationFullSlug = location.name.toLowerCase().replace(/\s+/g, '')
+        const serviceSlug = createSlug(selectedService)
+        const locationAbbrSlug = createSlug(location.abbr)
+        const locationFullSlug = createSlug(location.name)
         
         if (domainFormat === 'service+location') {
           abbreviationDomainsList.push({
@@ -261,9 +386,9 @@ export default function GeoDomainGenerator() {
       })
     } else if (selectedLocation && selectedService) {
       const locationData = locationList.find(loc => loc.abbr === selectedLocation)
-      const serviceSlug = selectedService.toLowerCase().replace(/\s+/g, '')
-      const locationAbbrSlug = selectedLocation.toLowerCase().replace(/\s+/g, '')
-      const locationFullSlug = locationData ? locationData.name.toLowerCase().replace(/\s+/g, '') : ''
+      const serviceSlug = createSlug(selectedService)
+      const locationAbbrSlug = createSlug(selectedLocation)
+      const locationFullSlug = locationData ? createSlug(locationData.name) : ''
       
       if (domainFormat === 'service+location') {
         abbreviationDomainsList.push({
@@ -502,7 +627,6 @@ export default function GeoDomainGenerator() {
     const csvContent = [
       ['Domain', 'Status', 'Availability', 'Days Until Expiry', 'Created Date', 'Registrar'].join(','),
       ...selectedDomains.map(domainStr => {
-        // Find domain object
         const allDomains = [...abbreviationDomains, ...fullNameDomains]
         const domainObj = allDomains.find(d => d.domain === domainStr) || {}
         
@@ -527,17 +651,27 @@ export default function GeoDomainGenerator() {
   }
 
   const randomizeInputs = () => {
-    if (states.length === 0 || cities.length === 0 || services.length === 0) return
+    const locationList = getLocationList()
+    const serviceList = getServiceList()
+    
+    if (locationList.length === 0 || serviceList.length === 0) return
     
     const randomLocationType = Math.random() > 0.5 ? 'state' : 'city'
     setSelectedLocationType(randomLocationType)
     
-    const currentLocationList = randomLocationType === 'state' ? states : cities
-    const randomLocation = currentLocationList[Math.floor(Math.random() * currentLocationList.length)]
-    setSelectedLocation(randomLocation.abbr)
+    const currentLocationList = randomLocationType === 'state' 
+      ? getLocationList().filter(loc => loc.type === 'state' || !loc.type)
+      : getLocationList().filter(loc => loc.type === 'city' || !loc.type)
     
-    const randomService = services[Math.floor(Math.random() * services.length)]
-    setSelectedService(randomService)
+    if (currentLocationList.length > 0) {
+      const randomLocation = currentLocationList[Math.floor(Math.random() * currentLocationList.length)]
+      setSelectedLocation(randomLocation.abbr)
+    }
+    
+    if (serviceList.length > 0) {
+      const randomService = serviceList[Math.floor(Math.random() * serviceList.length)]
+      setSelectedService(randomService)
+    }
     
     const randomExtension = extensions[Math.floor(Math.random() * extensions.length)]
     setSelectedExtension(randomExtension)
@@ -549,11 +683,14 @@ export default function GeoDomainGenerator() {
   // Initialize selections when data is loaded
   useEffect(() => {
     if (!loading) {
-      if (cities.length > 0 && !selectedLocation) {
-        setSelectedLocation(cities[0].abbr)
+      const locationList = getLocationList()
+      const serviceList = getServiceList()
+      
+      if (locationList.length > 0 && !selectedLocation) {
+        setSelectedLocation(locationList[0].abbr)
       }
-      if (services.length > 0 && !selectedService) {
-        setSelectedService(services[0])
+      if (serviceList.length > 0 && !selectedService) {
+        setSelectedService(serviceList[0])
       }
       generateDomains()
     }
@@ -561,21 +698,22 @@ export default function GeoDomainGenerator() {
 
   // Regenerate domains when dependencies change
   useEffect(() => {
-    if (!loading && services.length > 0 && locationList.length > 0) {
+    if (!loading) {
       generateDomains()
     }
-  }, [selectedLocation, selectedService, selectedExtension, domainFormat, selectedLocationType, loading])
+  }, [selectedLocation, selectedService, selectedExtension, domainFormat, selectedLocationType, loading, customLocations, customServices])
 
   const totalDomains = abbreviationDomains.length + fullNameDomains.length
+  const locationList = getLocationList()
+  const serviceList = getServiceList()
 
   const renderDomainList = (domains, section) => {
-    // Apply filter
     const filteredDomains = domains.filter(domain => {
       if (filterBy[section] === 'available') return domain.isRegistered === false
       if (filterBy[section] === 'registered') return domain.isRegistered === true
       if (filterBy[section] === 'error') return domain.error
       if (filterBy[section] === 'unchecked') return domain.isRegistered === null && !domain.error
-      return true // 'all'
+      return true
     })
     
     const maxVisible = viewMode[section] === 'compact' ? 10 : filteredDomains.length
@@ -584,7 +722,7 @@ export default function GeoDomainGenerator() {
       <div className="space-y-1">
         {filteredDomains.slice(0, maxVisible).map((domain, index) => (
           <div
-            key={`${section}-${index}`}
+            key={`${section}-${index}-${domain.domain}`}
             className={`flex items-center justify-between p-2 border rounded ${getStatusColor(domain)} ${
               selectedDomains.includes(domain.domain)
                 ? 'border-teal-500 ring-1 ring-teal-200'
@@ -657,7 +795,6 @@ export default function GeoDomainGenerator() {
     
     return (
       <>
-        {/* Desktop Controls */}
         <div className="hidden lg:flex items-center space-x-2 ml-2 flex-shrink-0">
           <div className="flex items-center space-x-1">
             <select
@@ -695,7 +832,6 @@ export default function GeoDomainGenerator() {
           </div>
         </div>
         
-        {/* Mobile Controls - Dropdown */}
         <div className="lg:hidden relative">
           <button
             onClick={(e) => {
@@ -787,9 +923,7 @@ export default function GeoDomainGenerator() {
   return (
     <div className="min-h-screen p-2 sm:p-3">
       <div className="max-w-6xl mx-auto">
-       
-
-        {/* Availability Stats - Responsive Grid */}
+        {/* Availability Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-4">
           <div className="bg-white border border-gray-200 rounded-lg p-2 sm:p-3">
             <div className="flex items-center justify-between">
@@ -882,8 +1016,11 @@ export default function GeoDomainGenerator() {
                     <button
                       onClick={() => {
                         setSelectedLocationType('city')
-                        if (cities.length > 0) {
-                          setSelectedLocation(cities[0].abbr)
+                        if (locationList.length > 0) {
+                          const cityLocations = locationList.filter(loc => loc.type === 'city' || !loc.type)
+                          if (cityLocations.length > 0) {
+                            setSelectedLocation(cityLocations[0].abbr)
+                          }
                         }
                       }}
                       className={`flex-1 py-1.5 sm:py-2 px-2 sm:px-3 text-xs sm:text-sm font-medium flex items-center justify-center ${
@@ -898,8 +1035,11 @@ export default function GeoDomainGenerator() {
                     <button
                       onClick={() => {
                         setSelectedLocationType('state')
-                        if (states.length > 0) {
-                          setSelectedLocation(states[0].abbr)
+                        if (locationList.length > 0) {
+                          const stateLocations = locationList.filter(loc => loc.type === 'state' || !loc.type)
+                          if (stateLocations.length > 0) {
+                            setSelectedLocation(stateLocations[0].abbr)
+                          }
                         }
                       }}
                       className={`flex-1 py-1.5 sm:py-2 px-2 sm:px-3 text-xs sm:text-sm font-medium flex items-center justify-center ${
@@ -915,9 +1055,54 @@ export default function GeoDomainGenerator() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {selectedLocationType === 'state' ? 'State (Abbreviation)' : 'City (Abbreviation)'}
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-gray-700">
+                      {selectedLocationType === 'state' ? 'State (Abbreviation)' : 'City (Abbreviation)'}
+                    </label>
+                    <button
+                      onClick={() => setShowCustomLocationForm(!showCustomLocationForm)}
+                      className="text-xs text-teal-600 hover:text-teal-800 flex items-center"
+                    >
+                      <FaPlus className="mr-1" size={10} />
+                      Add Custom
+                    </button>
+                  </div>
+                  
+                  {showCustomLocationForm && (
+                    <div className="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          placeholder={`${selectedLocationType === 'state' ? 'State' : 'City'} Name`}
+                          value={customLocationInput}
+                          onChange={(e) => setCustomLocationInput(e.target.value)}
+                          className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Abbreviation (e.g., NYC, LA)"
+                          value={customLocationAbbr}
+                          onChange={(e) => setCustomLocationAbbr(e.target.value)}
+                          className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                        />
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={addCustomLocation}
+                            className="flex-1 px-3 py-1.5 bg-teal-600 text-white text-sm rounded-lg hover:bg-teal-700"
+                          >
+                            Add Location
+                          </button>
+                          <button
+                            onClick={() => setShowCustomLocationForm(false)}
+                            className="px-3 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
                   <select
                     value={selectedLocation}
                     onChange={(e) => setSelectedLocation(e.target.value)}
@@ -925,32 +1110,120 @@ export default function GeoDomainGenerator() {
                   >
                     <option value="">Select {selectedLocationType === 'state' ? 'State' : 'City'}</option>
                     {locationList.map((location) => (
-                      <option key={location.abbr} value={location.abbr}>
+                      <option key={`${location.abbr}-${location.isCustom ? 'custom' : 'db'}`} value={location.abbr}>
                         {location.name} ({location.abbr})
+                        {location.isCustom && ' ★'}
                       </option>
                     ))}
                   </select>
+                  
+                  {/* Custom Locations List */}
+                  {customLocations.filter(loc => 
+                    selectedLocationType === 'state' ? loc.type === 'state' : loc.type === 'city'
+                  ).length > 0 && (
+                    <div className="mt-2">
+                      <div className="text-xs text-gray-600 mb-1">Your Custom Locations:</div>
+                      <div className="space-y-1">
+                        {customLocations.filter(loc => 
+                          selectedLocationType === 'state' ? loc.type === 'state' : loc.type === 'city'
+                        ).map(location => (
+                          <div key={`custom-${location.id}`} className="flex items-center justify-between p-1.5 bg-gray-50 rounded">
+                            <span className="text-xs">
+                              {location.name} ({location.abbr})
+                            </span>
+                            <button
+                              onClick={() => removeCustomLocation(location.id)}
+                              className="text-red-500 hover:text-red-700 p-1"
+                            >
+                              <FaTrash size={10} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="mt-1 text-xs text-gray-500">
                     Leave empty to use all {selectedLocationType === 'state' ? 'states' : 'cities'}
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Service
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Service
+                    </label>
+                    <button
+                      onClick={() => setShowCustomServiceForm(!showCustomServiceForm)}
+                      className="text-xs text-teal-600 hover:text-teal-800 flex items-center"
+                    >
+                      <FaPlus className="mr-1" size={10} />
+                      Add Custom
+                    </button>
+                  </div>
+                  
+                  {showCustomServiceForm && (
+                    <div className="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          placeholder="Service Name (e.g., Plumber, Electrician)"
+                          value={customServiceInput}
+                          onChange={(e) => setCustomServiceInput(e.target.value)}
+                          className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                        />
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={addCustomService}
+                            className="flex-1 px-3 py-1.5 bg-teal-600 text-white text-sm rounded-lg hover:bg-teal-700"
+                          >
+                            Add Service
+                          </button>
+                          <button
+                            onClick={() => setShowCustomServiceForm(false)}
+                            className="px-3 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
                   <select
                     value={selectedService}
                     onChange={(e) => setSelectedService(e.target.value)}
                     className="w-full px-2 sm:px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500 text-gray-700"
                   >
                     <option value="">Select Service</option>
-                    {services.map((service) => (
-                      <option key={service} value={service}>
+                    {serviceList.map((service, index) => (
+                      <option key={`${service}-${index}`} value={service}>
                         {service}
+                        {customServices.includes(service) && ' ★'}
                       </option>
                     ))}
                   </select>
+                  
+                  {/* Custom Services List */}
+                  {customServices.length > 0 && (
+                    <div className="mt-2">
+                      <div className="text-xs text-gray-600 mb-1">Your Custom Services:</div>
+                      <div className="space-y-1">
+                        {customServices.map((service, index) => (
+                          <div key={`custom-service-${index}`} className="flex items-center justify-between p-1.5 bg-gray-50 rounded">
+                            <span className="text-xs">{service}</span>
+                            <button
+                              onClick={() => removeCustomService(service)}
+                              className="text-red-500 hover:text-red-700 p-1"
+                            >
+                              <FaTrash size={10} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="mt-1 text-xs text-gray-500">
                     Leave empty to use all services
                   </div>
@@ -1006,9 +1279,9 @@ export default function GeoDomainGenerator() {
 
                   <button
                     onClick={randomizeInputs}
-                    disabled={states.length === 0 || cities.length === 0 || services.length === 0}
+                    disabled={locationList.length === 0 || serviceList.length === 0}
                     className={`w-full flex items-center justify-center px-3 py-2 font-medium rounded-lg text-sm ${
-                      states.length === 0 || cities.length === 0 || services.length === 0
+                      locationList.length === 0 || serviceList.length === 0
                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                         : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
                     }`}
@@ -1198,9 +1471,9 @@ export default function GeoDomainGenerator() {
                     <span className="text-gray-600 text-xs font-bold">1</span>
                   </div>
                   <div>
-                    <h4 className="text-sm font-medium text-gray-800">Generate Domains</h4>
+                    <h4 className="text-sm font-medium text-gray-800">Customize Inputs</h4>
                     <p className="text-xs text-gray-600">
-                      Select format, location type, service, and extension. Click "Generate Domains" to create domain combinations.
+                      Select format, location type, service, and extension. Use "Add Custom" buttons to add your own locations or services not in the list.
                     </p>
                   </div>
                 </div>
@@ -1210,9 +1483,9 @@ export default function GeoDomainGenerator() {
                     <span className="text-gray-600 text-xs font-bold">2</span>
                   </div>
                   <div>
-                    <h4 className="text-sm font-medium text-gray-800">Check Availability</h4>
+                    <h4 className="text-sm font-medium text-gray-800">Generate & Check</h4>
                     <p className="text-xs text-gray-600">
-                      Click "Check Availability" to verify which domains are available (green) or registered (red).
+                      Generate domain combinations and check availability. Green domains are available, red are registered.
                     </p>
                   </div>
                 </div>
@@ -1222,9 +1495,9 @@ export default function GeoDomainGenerator() {
                     <span className="text-gray-600 text-xs font-bold">3</span>
                   </div>
                   <div>
-                    <h4 className="text-sm font-medium text-gray-800">Filter & Select</h4>
+                    <h4 className="text-sm font-medium text-gray-800">Filter & Export</h4>
                     <p className="text-xs text-gray-600">
-                      Filter by availability status, sort alphabetically, select domains, then copy or export them.
+                      Filter by status, select domains, then copy or export them as CSV. Your custom locations/services are saved locally.
                     </p>
                   </div>
                 </div>
