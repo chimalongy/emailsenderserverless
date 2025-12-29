@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { FaSearch, FaSpinner, FaLink, FaList, FaMapMarkerAlt, FaKey } from 'react-icons/fa'
+import { FaSearch, FaSpinner, FaLink, FaList } from 'react-icons/fa'
 import { MdClose } from 'react-icons/md'
 import { useAuth } from '../../../components/AuthProvider'
 import { supabase } from '../../../lib/supabase'
@@ -9,8 +9,7 @@ import { supabase } from '../../../lib/supabase'
 export default function SearchModal({ isOpen, onClose, onNewSearch }) {
   const { user, loading: authLoading } = useAuth()
   const [searchName, setSearchName] = useState('')
-  const [searchKeywords, setSearchKeywords] = useState('')
-  const [searchLocations, setSearchLocations] = useState('')
+  const [searchQueries, setSearchQueries] = useState('')
   const [urlList, setUrlList] = useState('')
   const [searchMethod, setSearchMethod] = useState('query') // 'query' or 'urls'
   const [isSearching, setIsSearching] = useState(false)
@@ -47,27 +46,6 @@ export default function SearchModal({ isOpen, onClose, onNewSearch }) {
     return { uniqueUrls, duplicateDomains, totalDuplicates: urls.length - uniqueUrls.length }
   }
 
-  // Process keywords and locations into arrays
-  const keywordsArray = useMemo(() => {
-    return searchKeywords.split('\n').map(k => k.trim()).filter(Boolean)
-  }, [searchKeywords])
-
-  const locationsArray = useMemo(() => {
-    return searchLocations.split('\n').map(l => l.trim()).filter(Boolean)
-  }, [searchLocations])
-
-  // Calculate total combinations for display only
-  const totalCombinations = useMemo(() => {
-    const keywordsCount = keywordsArray.length
-    const locationsCount = locationsArray.length
-    
-    if (keywordsCount === 0 && locationsCount === 0) return 0
-    if (keywordsCount === 0) return locationsCount
-    if (locationsCount === 0) return keywordsCount
-    
-    return keywordsCount * locationsCount
-  }, [keywordsArray, locationsArray])
-
   // Process and deduplicate URLs as user types
   const processedUrls = useMemo(() => {
     const urls = urlList.split('\n').map(u => u.trim()).filter(Boolean)
@@ -92,11 +70,9 @@ export default function SearchModal({ isOpen, onClose, onNewSearch }) {
       return
     }
 
-    if (searchMethod === 'query') {
-      if (keywordsArray.length === 0 && locationsArray.length === 0) {
-        alert('Please enter either keywords, locations, or both')
-        return
-      }
+    if (searchMethod === 'query' && !searchQueries.trim()) {
+      alert('Please enter at least one search query')
+      return
     }
 
     if (searchMethod === 'urls' && !urlList.trim()) {
@@ -117,13 +93,16 @@ export default function SearchModal({ isOpen, onClose, onNewSearch }) {
 
     setIsSearching(true)
 
-    // For query method, store keywords and locations separately
-    const keywords = searchMethod === 'query' ? keywordsArray : null
-    const locations = searchMethod === 'query' ? locationsArray : null
-    const urls = searchMethod === 'urls' ? processedUrls.uniqueUrls : null
+    const queries =
+      searchMethod === 'query'
+        ? searchQueries.split('\n').map(q => q.trim()).filter(Boolean)
+        : null
 
-    console.log(keywords)
-    console.log(locations)
+    // Use deduplicated URLs for processing
+    const urls =
+      searchMethod === 'urls'
+        ? processedUrls.uniqueUrls
+        : null
 
     let scrappingId = null
 
@@ -135,12 +114,10 @@ export default function SearchModal({ isOpen, onClose, onNewSearch }) {
           user_id: user.id,
           name: searchName,
           method: searchMethod,
-          // Store keywords and locations separately
-          keywords,
-          locations,
+          queries,
           urls,
           status: 'pending',
-          // Store metadata about deduplication for URLs
+          // Store metadata about deduplication
           metadata: searchMethod === 'urls' ? {
             total_urls_submitted: urlList.split('\n').filter(u => u.trim()).length,
             unique_domains_processed: processedUrls.uniqueUrls.length,
@@ -162,6 +139,8 @@ export default function SearchModal({ isOpen, onClose, onNewSearch }) {
         throw new Error('Your session has expired. Please sign in again.')
       }
 
+
+
       console.log(data)
       
       // Step 2: Call the API route to start the scrapping process
@@ -171,24 +150,45 @@ export default function SearchModal({ isOpen, onClose, onNewSearch }) {
           ? '/api/scrappings/start-query-scrapping'
           : '/api/scrappings/start-link-scrapping'
 
-      response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          scrapping: {
-            id: data.id,
-            user_id: data.user_id,
-            method: data.method,
-            keywords: data.keywords,
-            locations: data.locations,
-            urls: data.urls,
-            name: data.name
-          }
-        }),
-      })
+      if (data.method = "url") {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            scrapping: {
+              id: data.id,
+              user_id: data.user_id,
+              method: data.method,
+              queries: data.queries,
+              urls: data.urls,
+              name: data.name
+            }
+          }),
+        })
+      }
+      else if (data.method = "query") {
+
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            scrapping: {
+              id: data.id,
+              user_id: data.user_id,
+              method: data.method,
+              queries: data.queries,
+              urls: data.urls,
+              name: data.name,
+            },
+          }),
+        })
+      }
 
       if (!response.ok) {
         const errorText = await response.text()
@@ -264,8 +264,7 @@ export default function SearchModal({ isOpen, onClose, onNewSearch }) {
 
   const resetForm = () => {
     setSearchName('')
-    setSearchKeywords('')
-    setSearchLocations('')
+    setSearchQueries('')
     setUrlList('')
   }
 
@@ -278,7 +277,7 @@ export default function SearchModal({ isOpen, onClose, onNewSearch }) {
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl max-w-2xl w-full p-6 shadow-2xl">
+      <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-2xl">
         <div className="flex justify-between items-center mb-6">
           <div>
             <h3 className="text-xl font-semibold text-gray-800">New Email Search</h3>
@@ -335,130 +334,34 @@ export default function SearchModal({ isOpen, onClose, onNewSearch }) {
               />
             </div>
 
-            {/* Query Search Method - Keywords and Locations as separate fields */}
+            {/* Query Search Method */}
             {searchMethod === 'query' && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Keywords Section */}
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700">
-                      <FaKey className="inline-block mr-1 h-3 w-3" />
-                      Keywords (One per line)
-                    </label>
-                    <div className="relative">
-                      <textarea
-                        value={searchKeywords}
-                        onChange={(e) => setSearchKeywords(e.target.value)}
-                        placeholder="plumbers
-electricians
-law firms
-restaurants
-dentists
-real estate agents
-web developers"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 h-40 font-mono text-sm resize-none transition-colors"
-                      />
-                      <div className="absolute top-3 right-3">
-                        <div className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full">
-                          {keywordsArray.length} keywords
-                        </div>
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-500">
-                      Services, professions, or business types
-                    </p>
-                  </div>
-
-                  {/* Locations Section */}
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700">
-                      <FaMapMarkerAlt className="inline-block mr-1 h-3 w-3" />
-                      Locations (One per line)
-                    </label>
-                    <div className="relative">
-                      <textarea
-                        value={searchLocations}
-                        onChange={(e) => setSearchLocations(e.target.value)}
-                        placeholder="san diego ca
-new york ny
-austin tx
-chicago il
-miami fl
-los angeles ca
-boston ma"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 h-40 font-mono text-sm resize-none transition-colors"
-                      />
-                      <div className="absolute top-3 right-3">
-                        <div className="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">
-                          {locationsArray.length} locations
-                        </div>
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-500">
-                      Cities, states, or regions (include state code when possible)
-                    </p>
-                  </div>
-                </div>
-
-                {/* Query Summary */}
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-700">
-                        Search Configuration
-                      </h4>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Keywords and locations will be combined during the search process
-                      </p>
-                    </div>
-                    <div className={`text-xs font-medium px-2 py-1 rounded-full ${
-                      totalCombinations > 20 
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-teal-100 text-teal-800'
-                    }`}>
-                      {totalCombinations} potential searches
-                    </div>
-                  </div>
-                  
-                  <div className="mt-3 grid grid-cols-2 gap-4 text-sm text-gray-600">
-                    <div>
-                      <span className="font-medium">Keywords:</span>
-                      <div className="mt-1 text-xs">
-                        {keywordsArray.length > 0 ? (
-                          <span className="text-gray-500">
-                            {keywordsArray.slice(0, 3).join(', ')}
-                            {keywordsArray.length > 3 && ` +${keywordsArray.length - 3} more`}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400 italic">No keywords entered</span>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <span className="font-medium">Locations:</span>
-                      <div className="mt-1 text-xs">
-                        {locationsArray.length > 0 ? (
-                          <span className="text-gray-500">
-                            {locationsArray.slice(0, 3).join(', ')}
-                            {locationsArray.length > 3 && ` +${locationsArray.length - 3} more`}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400 italic">No locations entered</span>
-                        )}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Search Queries (One per line) *
+                  </label>
+                  <div className="relative">
+                    <textarea
+                      value={searchQueries}
+                      onChange={(e) => setSearchQueries(e.target.value)}
+                      placeholder="plumbers in san diego
+tech startups austin
+digital marketing agencies new york
+restaurant owners chicago
+law firms boston"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 h-40 font-mono text-sm resize-none transition-colors"
+                      required
+                    />
+                    <div className="absolute top-3 right-3 flex items-center gap-2">
+                      <div className="bg-teal-100 text-teal-800 text-xs font-medium px-2 py-1 rounded-full">
+                        {searchQueries.split('\n').filter(query => query.trim()).length} queries
                       </div>
                     </div>
                   </div>
-                  
-                  <div className="mt-3 text-xs text-gray-500 border-t border-gray-200 pt-3">
-                    {keywordsArray.length > 0 && locationsArray.length > 0 
-                      ? `${keywordsArray.length} keywords × ${locationsArray.length} locations = ${totalCombinations} search combinations`
-                      : keywordsArray.length > 0 
-                        ? `${keywordsArray.length} keyword searches`
-                        : locationsArray.length > 0
-                          ? `${locationsArray.length} location-based searches`
-                          : 'Enter keywords and/or locations to configure your search'
-                    }
-                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Each line will be processed as a separate search query
+                  </p>
                 </div>
               </div>
             )}
@@ -530,7 +433,7 @@ https://consultingfirm.net/about"
               <button
                 type="submit"
                 disabled={isSearching || !searchName.trim() ||
-                  (searchMethod === 'query' && keywordsArray.length === 0 && locationsArray.length === 0) ||
+                  (searchMethod === 'query' && !searchQueries.trim()) ||
                   (searchMethod === 'urls' && processedUrls.uniqueUrls.length === 0)}
                 className="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-teal-600 to-teal-700 rounded-lg hover:from-teal-700 hover:to-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 shadow-md hover:shadow-lg"
               >
@@ -544,7 +447,7 @@ https://consultingfirm.net/about"
                     {searchMethod === 'query' ? (
                       <>
                         <FaSearch />
-                        Start Search
+                        Start {searchQueries.split('\n').filter(q => q.trim()).length} Query Search
                       </>
                     ) : (
                       <>

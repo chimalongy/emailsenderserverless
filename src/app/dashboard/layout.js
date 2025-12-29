@@ -17,7 +17,8 @@ import {
   FaHome,
   FaChevronRight,
   FaSearch,
-  FaTools
+  FaTools,
+  FaBriefcase // Added for Portfolio icon
 } from 'react-icons/fa'
 
 export default function DashboardLayout({ children }) {
@@ -106,6 +107,12 @@ export default function DashboardLayout({ children }) {
       description: 'Manage email accounts'
     },
     { 
+      name: 'Portfolio', 
+      href: '/dashboard/portfolio', 
+      icon: <FaBriefcase className="w-5 h-5" />,
+      description: 'View and manage portfolio'
+    },
+    { 
       name: 'Campaigns', 
       href: '/dashboard/outbounds', 
       icon: <FaPaperPlane className="w-5 h-5" />,
@@ -132,6 +139,7 @@ export default function DashboardLayout({ children }) {
   const getPageTitle = () => {
     if (pathname === '/dashboard') return 'Dashboard'
     if (pathname === '/dashboard/emails') return 'Email Accounts'
+    if (pathname === '/dashboard/portfolio') return 'Portfolio'
     if (pathname === '/dashboard/outbounds') return 'Campaigns'
     if (pathname === '/dashboard/settings') return 'Settings'
     if (pathname === '/dashboard/scrape-emails') return 'Scrape Emails'
@@ -402,6 +410,7 @@ export default function DashboardLayout({ children }) {
                 <p className="text-sm text-gray-500 mt-1">
                   {pathname === '/dashboard' && 'Overview and analytics of your email campaigns'}
                   {pathname === '/dashboard/emails' && 'Manage your email accounts and connections'}
+                  {pathname === '/dashboard/portfolio' && 'View and manage your portfolio projects'}
                   {pathname === '/dashboard/outbounds' && 'Create and manage your outreach campaigns'}
                   {pathname === '/dashboard/settings' && 'Manage your account settings'}
                   {pathname === '/dashboard/scrape-emails' && 'Find and scrape email addresses for your campaigns'}

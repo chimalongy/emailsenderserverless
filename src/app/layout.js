@@ -11,7 +11,7 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }) {
-  const zoom = 0.85; // 75%
+  const zoom = 0.90;
 
   return (
     <html lang="en">
@@ -19,12 +19,12 @@ export default function RootLayout({ children }) {
         <AuthProvider>
           {/* Zoom Wrapper */}
           <div
-            style={{
-              transform: `scale(${zoom})`,
-              transformOrigin: "0 0",
-              width: `${100 / zoom}%`,
-              minHeight: `${100 / zoom}vh`,
-            }}
+            // style={{
+            //   transform: `scale(${zoom})`,
+            //   transformOrigin: "0 0",
+            //   width: `${100 / zoom}%`,
+            //   minHeight: `${100 / zoom}vh`,
+            // }}
           >
             {children}
           </div>

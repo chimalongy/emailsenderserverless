@@ -1,131 +1,88 @@
-import type { scrapeEmailsTask } from "../../../../trigger/scrapeEmailsTask";
-import { configure, tasks } from "@trigger.dev/sdk";
-import { NextResponse } from "next/server";
-import axios from "axios";
-import { createClient } from "@supabase/supabase-js";
+import { NextResponse } from 'next/server';
 
-configure({
-  secretKey: process.env.TRIGGER_SECRET_KEY,
-});
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY! // server-only
-);
-
-/* ----------------------------------
-   Helpers
------------------------------------ */
-function parseQuery(q: string) {
-  const lower = q.toLowerCase().trim();
-  if (!lower.includes(" in ")) return { query: lower, city: "" };
-  const [query, city] = lower.split(" in ").map((s) => s.trim());
-  return { query, city };
-}
-
-async function getLinksFromGoogle(query: string) {
-  try {
-    const res = await axios.get("https://www.googleapis.com/customsearch/v1", {
-      params: {
-        key: process.env.GOOGLE_SEARCH_API_KEY,
-        cx: process.env.GOOGLE_SEARCH_ENGINE_ID,
-        q: query,
-        num: 10, // max 10 results per query
-      },
-    });
-
-    const items = res.data.items || [];
-    // Filter out Google internal links, directories, etc.
-    return items
-      .map((i: any) => i.link)
-      .filter(
-        (url: string) =>
-          url &&
-          !url.includes("google.com") &&
-          !url.includes("youtube.com") &&
-          !url.includes("facebook.com")
-      );
-  } catch (err: any) {
-    console.error(`Google search failed for "${query}":`, err.response?.data || err.message);
-    return [];
-  }
-}
-
-/* ----------------------------------
-   POST
------------------------------------ */
-export async function POST(req: Request) {
+export async function POST(req) {
   try {
     const { scrapping } = await req.json();
-    const { id, user_id, queries } = scrapping;
+    const { keywords, locations } = scrapping;
 
-    console.log("Scrapping request received:", scrapping);
+    console.log('🚀 Starting Scrape for:', { keywords, locations });
+    const allFoundBusinesses = [];
 
-    if (!id || !user_id || !Array.isArray(queries)) {
-      return NextResponse.json(
-        { error: "Invalid scrapping payload" },
-        { status: 400 }
-      );
+    for (const location of locations) {
+      for (const keyword of keywords) {
+        try {
+          console.log(`🔍 Searching for "${keyword}" in "${location}"...`);
+
+          // This query is more robust:
+          // 1. We use a wider 'around' search or a more flexible 'area' search.
+          // 2. We search for the keyword in amenity, shop, and craft.
+          const overpassQuery = `
+            [out:json][timeout:60];
+            // Search for the location area first
+            {{geocodeArea:${location}}}->.searchArea;
+            (
+              node["amenity"~"${keyword}", i](area.searchArea);
+              way["amenity"~"${keyword}", i](area.searchArea);
+              node["shop"~"${keyword}", i](area.searchArea);
+              way["shop"~"${keyword}", i](area.searchArea);
+              node["craft"~"${keyword}", i](area.searchArea);
+              way["craft"~"${keyword}", i](area.searchArea);
+              // Also search for the keyword in the name just in case
+              node["name"~"${keyword}", i](area.searchArea);
+              way["name"~"${keyword}", i](area.searchArea);
+            );
+            out body;
+            >;
+            out skel qt;
+          `;
+
+          // Note: Overpass Turbo supports {{geocodeArea}}, 
+          // but for raw API calls, we must use the Area ID or search by name.
+          // Let's use the most reliable RAW API format:
+          const rawQuery = `
+            [out:json][timeout:60];
+            area["name"~"${location}", i]->.searchArea;
+            (
+              node["amenity"~"${keyword}", i](area.searchArea);
+              node["shop"~"${keyword}", i](area.searchArea);
+              node["craft"~"${keyword}", i](area.searchArea);
+              node["name"~"${keyword}", i](area.searchArea);
+            );
+            out body;
+          `;
+
+          const response = await fetch("https://overpass-api.de/api/interpreter", {
+            method: "POST",
+            body: rawQuery,
+          });
+
+          const data = await response.json();
+
+          if (!data.elements || data.elements.length === 0) {
+            console.log(`⚠️ No results found for "${keyword}" in "${location}".`);
+            continue;
+          }
+
+          const businesses = data.elements.map(item => ({
+            name: item.tags?.name || "Unknown",
+            website: item.tags?.website || item.tags?.["contact:website"] || "N/A",
+            phone: item.tags?.phone || item.tags?.["contact:phone"] || "N/A",
+            city: item.tags?.["addr:city"] || location
+          }));
+
+          allFoundBusinesses.push(...businesses);
+          console.log(`✅ Success: Found ${businesses.length} items in ${location}`);
+
+        } catch (err) {
+          console.error(`💥 Query failed for ${location}:`, err);
+        }
+      }
     }
 
-    let allUrls: string[] = [];
+    console.table(allFoundBusinesses);
+    return NextResponse.json({ success: true, count: allFoundBusinesses.length });
 
-    for (const q of queries) {
-      const { query, city } = parseQuery(q);
-      const fullQuery = city ? `${query} in ${city}` : query;
-
-      if (!query) {
-        console.warn(`Skipping invalid query: "${q}"`);
-        continue;
-      }
-
-      try {
-        const urls = await getLinksFromGoogle(fullQuery);
-        allUrls.push(...urls);
-      } catch (err) {
-        console.error(`Google request failed for "${fullQuery}":`, err);
-      }
-    }
-
-    allUrls = [...new Set(allUrls)]; // deduplicate
-    console.log("Resolved URLs:", allUrls);
-
-    if (allUrls.length === 0) {
-      return NextResponse.json(
-        { error: "No websites found from search queries" },
-        { status: 404 }
-      );
-    }
-
-    // ✅ Save resolved URLs to Supabase before triggering scraper
-    await supabase
-      .from("scrappings")
-      .update({
-        urls: allUrls,
-        resolved_at: new Date().toISOString(),
-      })
-      .eq("id", id);
-
-    // 🚀 Trigger scraping task
-    const handle = await tasks.trigger<typeof scrapeEmailsTask>(
-      "scrape-emails-task",
-      {
-        scrappingId: id,
-        userId: user_id,
-        urls: allUrls,
-      }
-    );
-
-    return NextResponse.json({
-      success: true,
-      totalUrls: allUrls.length,
-      runId: handle.id,
-    });
-  } catch (err) {
-    console.error("query-search error:", err);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+  } catch (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
