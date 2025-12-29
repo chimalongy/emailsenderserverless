@@ -964,10 +964,10 @@ export default function PortfolioPage() {
     <div className="space-y-6">
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
+        {/* <div>
           <h2 className="text-xl font-bold text-gray-800">Domain Portfolio</h2>
           <p className="text-gray-600">Manage your domain investments</p>
-        </div>
+        </div> */}
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setIsAddModalOpen(true)}

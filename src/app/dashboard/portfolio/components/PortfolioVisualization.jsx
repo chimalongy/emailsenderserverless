@@ -176,10 +176,10 @@ const PortfolioVisualization = ({ domains }) => {
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6">
-        <div>
+        {/* <div>
           <h3 className="text-lg font-bold text-gray-800">Portfolio Visualization</h3>
           <p className="text-gray-600 text-sm">Visual insights into your domain portfolio</p>
-        </div>
+        </div> */}
         <div className="flex items-center space-x-4 mt-4 sm:mt-0">
           <select
             value={timeFilter}
