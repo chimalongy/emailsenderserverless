@@ -67,6 +67,17 @@ export async function POST(request) {
       throw new Error(`Email with id ${email_id} not found in database. It may have been deleted or never created. Please check if the email_queue table has an 'id' column.`)
     }
 
+    // Only send emails that are still scheduled.
+    // QStash may still call this endpoint after a user "cancels" a scheduled email,
+    // so we must guard against sending cancelled/unscheduled rows.
+    if (email.status !== 'scheduled') {
+      return NextResponse.json({
+        success: true,
+        message: `Skipping send because email status is '${email.status}'`,
+        skipped: true,
+      })
+    }
+
     // Check if email was already sent
     if (email.status === 'sent') {
       return NextResponse.json({ 

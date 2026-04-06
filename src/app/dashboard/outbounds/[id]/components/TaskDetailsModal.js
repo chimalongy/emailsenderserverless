@@ -17,7 +17,8 @@ import {
   FaExternalLinkAlt,
   FaFileAlt,
   FaExpand,
-  FaCompress
+  FaCompress,
+  FaBan
 } from 'react-icons/fa';
 import { supabase } from '../../../../lib/supabase';
 import toast from 'react-hot-toast';
@@ -28,6 +29,8 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
   const [emailsData, setEmailsData] = useState({});
   const [loadingEmails, setLoadingEmails] = useState({});
   const [sendingEmails, setSendingEmails] = useState(new Set());
+  const [cancellingEmails, setCancellingEmails] = useState(new Set());
+  const [cancellingAll, setCancellingAll] = useState(false);
   const [showFullMessage, setShowFullMessage] = useState(false);
 
   const statusColors = {
@@ -167,6 +170,100 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
     await handleSendNow(emailId, recipient);
   };
 
+  const handleCancelScheduled = async (emailId, recipient) => {
+    if (cancellingEmails.has(emailId)) return;
+
+    setCancellingEmails(prev => new Set(prev).add(emailId));
+    const toastId = toast.loading(`Cancelling scheduled email for ${recipient}...`);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Please log in again', { id: toastId });
+        return;
+      }
+
+      const response = await fetch('/api/tasks/cancel-scheduled', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ email_id: emailId })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success('Scheduled email cancelled', { id: toastId });
+
+        // Refresh emails for the current section
+        if (expandedSection && expandedSection.includes('::')) {
+          const [accountId, section] = expandedSection.split('::');
+          await fetchEmailsForAccount(accountId, section);
+        }
+
+        if (onRefresh) onRefresh();
+      } else {
+        toast.error(result.error || 'Failed to cancel scheduled email', { id: toastId });
+      }
+    } catch (error) {
+      console.error('Error cancelling scheduled email:', error);
+      toast.error('Failed to cancel scheduled email', { id: toastId });
+    } finally {
+      setCancellingEmails(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(emailId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleCancelAllScheduledForTask = async () => {
+    if (!task?.id || cancellingAll) return;
+
+    setCancellingAll(true);
+    const toastId = toast.loading('Cancelling all scheduled emails for this task...');
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Please log in again', { id: toastId });
+        return;
+      }
+
+      const response = await fetch('/api/tasks/cancel-scheduled', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ task_id: task.id })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success(`Cancelled ${result.cancelled || 0} scheduled email(s)`, { id: toastId });
+
+        // Refresh the currently open section (if any)
+        if (expandedSection && expandedSection.includes('::')) {
+          const [accountId, section] = expandedSection.split('::');
+          await fetchEmailsForAccount(accountId, section);
+        }
+
+        if (onRefresh) onRefresh();
+      } else {
+        toast.error(result.error || 'Failed to cancel scheduled emails', { id: toastId });
+      }
+    } catch (error) {
+      console.error('Error cancelling scheduled emails:', error);
+      toast.error('Failed to cancel scheduled emails', { id: toastId });
+    } finally {
+      setCancellingAll(false);
+    }
+  };
+
   const formatTime = (dateString) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
@@ -223,6 +320,7 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
       <div className="space-y-1">
         {emails.map(email => {
           const isSending = sendingEmails.has(email.id);
+          const isCancelling = cancellingEmails.has(email.id);
           const isSent = type === 'sent';
           const isFailed = type === 'failed';
           const isScheduled = type === 'scheduled';
@@ -264,29 +362,52 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
               {/* Right side: Action button */}
               <div className="ml-2">
                 {(isScheduled || isFailed) && (
-                  <button
-                    onClick={() => isScheduled ? handleSendNow(email.id, email.recipient) : handleResend(email.id, email.recipient)}
-                    disabled={isSending}
-                    className={`px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
-                      isScheduled 
-                        ? 'bg-teal-600 hover:bg-teal-700 text-white' 
-                        : 'bg-rose-100 hover:bg-rose-200 text-rose-700'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    {isSending ? (
-                      <>
-                        <FaSpinner className="w-3 h-3 animate-spin" />
-                        <span className="hidden sm:inline">Sending</span>
-                      </>
-                    ) : (
-                      <>
-                        <FaPaperPlane className="w-3 h-3" />
-                        <span className="hidden sm:inline">
-                          {isScheduled ? 'Send Now' : 'Resend'}
-                        </span>
-                      </>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => isScheduled ? handleSendNow(email.id, email.recipient) : handleResend(email.id, email.recipient)}
+                      disabled={isSending}
+                      className={`px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
+                        isScheduled 
+                          ? 'bg-teal-600 hover:bg-teal-700 text-white' 
+                          : 'bg-rose-100 hover:bg-rose-200 text-rose-700'
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      {isSending ? (
+                        <>
+                          <FaSpinner className="w-3 h-3 animate-spin" />
+                          <span className="hidden sm:inline">Sending</span>
+                        </>
+                      ) : (
+                        <>
+                          <FaPaperPlane className="w-3 h-3" />
+                          <span className="hidden sm:inline">
+                            {isScheduled ? 'Send Now' : 'Resend'}
+                          </span>
+                        </>
+                      )}
+                    </button>
+
+                    {isScheduled && (
+                      <button
+                        onClick={() => handleCancelScheduled(email.id, email.recipient)}
+                        disabled={isCancelling}
+                        className="px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Cancel scheduled send"
+                      >
+                        {isCancelling ? (
+                          <>
+                            <FaSpinner className="w-3 h-3 animate-spin" />
+                            <span className="hidden sm:inline">Cancelling</span>
+                          </>
+                        ) : (
+                          <>
+                            <FaBan className="w-3 h-3" />
+                            <span className="hidden sm:inline">Cancel</span>
+                          </>
+                        )}
+                      </button>
                     )}
-                  </button>
+                  </div>
                 )}
                 {isSent && (
                   <div className="px-2.5 py-1.5 text-xs text-emerald-700 bg-emerald-50 rounded-lg">
@@ -591,12 +712,35 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
                                   ({emailsData[expandedSection]?.length || 0})
                                 </span>
                               </h5>
-                              <button
-                                onClick={() => toggleAccordion(null)}
-                                className="p-1 hover:bg-gray-200 rounded"
-                              >
-                                <FaChevronUp className="w-3.5 h-3.5 text-gray-500" />
-                              </button>
+                              <div className="flex items-center gap-2">
+                                {getSectionFromKey(expandedSection, a.account_id) === 'scheduled' && (
+                                  <button
+                                    onClick={handleCancelAllScheduledForTask}
+                                    disabled={cancellingAll}
+                                    className="px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 bg-gray-800 hover:bg-gray-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Cancel all scheduled emails for this task"
+                                  >
+                                    {cancellingAll ? (
+                                      <>
+                                        <FaSpinner className="w-3 h-3 animate-spin" />
+                                        <span className="hidden sm:inline">Cancelling all</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <FaBan className="w-3 h-3" />
+                                        <span className="hidden sm:inline">Cancel all</span>
+                                      </>
+                                    )}
+                                  </button>
+                                )}
+
+                                <button
+                                  onClick={() => toggleAccordion(null)}
+                                  className="p-1 hover:bg-gray-200 rounded"
+                                >
+                                  <FaChevronUp className="w-3.5 h-3.5 text-gray-500" />
+                                </button>
+                              </div>
                             </div>
                             
                             <div className="max-h-48 overflow-y-auto">
