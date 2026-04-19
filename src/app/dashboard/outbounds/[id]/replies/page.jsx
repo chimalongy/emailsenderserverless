@@ -19,6 +19,7 @@ export default function OutboundRepliesPage() {
   const [error, setError] = useState('')
   const [meta, setMeta] = useState(null)
   const [deletedEmailList, setDeletedEmailList] = useState([])
+  const [selectedReplies, setSelectedReplies] = useState([])
   const [replyModal, setReplyModal] = useState({
     isOpen: false,
     reply: null
@@ -354,6 +355,149 @@ export default function OutboundRepliesPage() {
     }
   }
 
+  const toggleSelectReply = (replyId, e) => {
+    e.stopPropagation()
+    setSelectedReplies(prev => {
+      if (prev.includes(replyId)) {
+        return prev.filter(id => id !== replyId)
+      } else {
+        return [...prev, replyId]
+      }
+    })
+  }
+
+  const toggleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedReplies(filteredReplies.map(r => r.id || r.messageId))
+    } else {
+      setSelectedReplies([])
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedReplies.length === 0) return
+    
+    if (!confirm(`Are you sure you want to remove ${selectedReplies.length} selected email(s) from your list?`)) {
+      return
+    }
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Your session has expired. Please sign in again.')
+
+      const { data: outboundData, error: outboundError } = await supabase
+        .from('outbounds')
+        .select('email_list, deleted_emails, allocations')
+        .eq('id', outboundId)
+        .eq('user_id', session.user.id)
+        .maybeSingle()
+
+      if (outboundError) throw outboundError
+      if (!outboundData) throw new Error('Outbound not found')
+
+      let rawEmails = (outboundData.email_list || '').split('\n')
+        .map(e => e.trim())
+        .filter(e => e.length > 0)
+
+      const deletedEmails = (outboundData.deleted_emails || '').split('\n')
+        .map(e => e.trim())
+        .filter(e => e.length > 0)
+        
+      let allocations = Array.isArray(outboundData.allocations) ? outboundData.allocations : []
+
+      const emailsToDelete = new Set()
+
+      for (const replyId of selectedReplies) {
+        const reply = allReplies.find(r => (r.id || r.messageId) === replyId)
+        if (!reply) continue
+
+        let emailToDelete = extractEmail(reply.from || reply.fromEmail || '')
+        const fromEmail = emailToDelete
+        const isMailerDaemon = fromEmail.includes('mailer-daemon') || 
+                              fromEmail.includes('mailer@') ||
+                              fromEmail.includes('postmaster') ||
+                              reply?.from?.toLowerCase().includes('mail delivery') ||
+                              reply?.subject?.toLowerCase().includes('delivery status')
+
+        if (isMailerDaemon && reply) {
+          const extractedEmail = extractEmailFromBounceBody(reply)
+          if (extractedEmail) {
+            emailToDelete = extractedEmail
+          } else if (reply.receiver) {
+            emailToDelete = reply.receiver
+          }
+        }
+        
+        emailsToDelete.add(emailToDelete)
+      }
+
+      const emailsDeletedArray = Array.from(emailsToDelete)
+
+      for (const emailToDelete of emailsDeletedArray) {
+        if (rawEmails.includes(emailToDelete)) {
+          let emailIndex = 0
+          let accountIdWithDeletedEmail = null
+          
+          for (const allocation of allocations) {
+            const allocated = allocation.allocated_emails || 0
+            for (let i = 0; i < allocated && emailIndex < rawEmails.length; i++) {
+              if (rawEmails[emailIndex] === emailToDelete) {
+                accountIdWithDeletedEmail = allocation.account_id
+                break
+              }
+              emailIndex++
+            }
+            if (accountIdWithDeletedEmail) break
+          }
+
+          if (accountIdWithDeletedEmail) {
+            allocations = allocations.map(allocation => {
+              if (allocation.account_id === accountIdWithDeletedEmail) {
+                return {
+                  ...allocation,
+                  allocated_emails: Math.max(0, (allocation.allocated_emails || 0) - 1)
+                }
+              }
+              return allocation
+            }).filter(alloc => alloc.allocated_emails > 0)
+          }
+
+          rawEmails = rawEmails.filter(e => e !== emailToDelete)
+        }
+
+        if (!deletedEmails.includes(emailToDelete)) {
+          deletedEmails.push(emailToDelete)
+        }
+      }
+
+      const { error: updateError } = await supabase
+        .from('outbounds')
+        .update({
+          email_list: rawEmails.join('\n'),
+          deleted_emails: deletedEmails.join('\n'),
+          allocations: allocations
+        })
+        .eq('id', outboundId)
+        .eq('user_id', session.user.id)
+
+      if (updateError) throw updateError
+
+      setDeletedEmailList(prev => {
+        const newSet = new Set(prev)
+        emailsDeletedArray.forEach(em => newSet.add(em))
+        return Array.from(newSet)
+      })
+
+      setSelectedReplies([])
+
+      toast.success(`Removed ${emailsDeletedArray.length} email(s)`)
+
+    } catch (err) {
+      console.error('Error deleting emails:', err)
+      toast.error('Failed to delete emails: ' + (err.message || 'Unknown error'))
+    }
+  }
+
   const formatDate = (dateString) => {
     if (!dateString) return 'Unknown'
     const date = new Date(dateString)
@@ -521,11 +665,36 @@ export default function OutboundRepliesPage() {
       {/* Replies Accordion - Mobile Optimized */}
       {filteredReplies.length > 0 && (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="p-3 border-b border-gray-200">
-            <h2 className="text-sm font-semibold text-gray-900">All Replies</h2>
-            <p className="text-xs text-gray-500">
-              {filteredReplies.length} replies from last 30 days
-            </p>
+          <div className="p-3 border-b border-gray-200 flex justify-between items-center">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">All Replies</h2>
+              <p className="text-xs text-gray-500">
+                {filteredReplies.length} replies from last 30 days
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                  checked={selectedReplies.length === filteredReplies.length && filteredReplies.length > 0}
+                  onChange={toggleSelectAll}
+                />
+                Select All
+              </label>
+              {selectedReplies.length > 0 && (
+                <button
+                  onClick={handleBulkDelete}
+                  className="inline-flex items-center px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium rounded transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Delete Selected ({selectedReplies.length})
+                </button>
+              )}
+            </div>
           </div>
           
           <ul className="divide-y divide-gray-200">
@@ -543,7 +712,7 @@ export default function OutboundRepliesPage() {
                   {/* Accordion Header - Mobile Optimized */}
                   <div
                     onClick={() => toggleAccordion(replyId)}
-                    className="w-full p-2.5 text-left hover:bg-gray-50 cursor-pointer"
+                    className="w-full p-2.5 text-left hover:bg-gray-50 cursor-pointer flex items-start gap-3"
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => {
@@ -553,7 +722,16 @@ export default function OutboundRepliesPage() {
                       }
                     }}
                   >
-                    <div className="flex items-start justify-between">
+                    <div className="mt-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                        checked={selectedReplies.includes(replyId)}
+                        onChange={(e) => toggleSelectReply(replyId, e)}
+                      />
+                    </div>
+                    
+                    <div className="flex items-start justify-between flex-1 min-w-0">
                       <div className="flex-1 min-w-0 pr-2">
                         <div className="flex items-center gap-2 mb-1.5">
                           <h3 className="text-sm font-medium text-gray-900 truncate">
