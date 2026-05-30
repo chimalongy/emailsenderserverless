@@ -234,7 +234,12 @@ export default function ScrapeEmailsPage() {
       emails: newSearch.emails || []
     }
     
-    setSearches(prev => [formattedSearch, ...prev])
+    setSearches(prev => {
+      if (prev.some(s => s.id === formattedSearch.id)) {
+        return prev
+      }
+      return [formattedSearch, ...prev]
+    })
     setShowSearchModal(false)
   }
 
@@ -342,7 +347,12 @@ export default function ScrapeEmailsPage() {
         emails: []
       }
       
-      setSearches(prev => [newSearch, ...prev])
+      setSearches(prev => {
+        if (prev.some(s => s.id === newSearch.id)) {
+          return prev
+        }
+        return [newSearch, ...prev]
+      })
       
       setRescrappingStates(prev => ({
         ...prev,
@@ -599,7 +609,14 @@ export default function ScrapeEmailsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-              {searches.map((search) => {
+              {(() => {
+                const seenIds = new Set()
+                return searches.filter(s => {
+                  if (seenIds.has(s.id)) return false
+                  seenIds.add(s.id)
+                  return true
+                })
+              })().map((search) => {
                 const realEmailCount = getRealEmailCount(search)
                 const isProcessing = search.status === 'processing' || search.status === 'pending'
                 const canReScrape = (search.status === 'completed' || search.status === 'failed') && 

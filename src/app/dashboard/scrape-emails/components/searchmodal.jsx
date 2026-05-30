@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { FaSearch, FaSpinner, FaLink, FaList, FaMapMarkerAlt, FaKey } from 'react-icons/fa'
 import { MdClose } from 'react-icons/md'
 import { useAuth } from '../../../components/AuthProvider'
@@ -14,6 +14,43 @@ export default function SearchModal({ isOpen, onClose, onNewSearch }) {
   const [urlList, setUrlList] = useState('')
   const [searchMethod, setSearchMethod] = useState('query') // 'query' or 'urls'
   const [isSearching, setIsSearching] = useState(false)
+  const [hasApifyKey, setHasApifyKey] = useState(false)
+  const [checkingApify, setCheckingApify] = useState(true)
+
+  useEffect(() => {
+    const checkApifyKey = async () => {
+      if (!user) return
+      try {
+        setCheckingApify(true)
+        const { count, error } = await supabase
+          .from('apify_apis')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+
+        if (error) {
+          console.error("Error checking Apify API key:", error)
+          setHasApifyKey(false)
+        } else {
+          setHasApifyKey(count > 0)
+        }
+      } catch (err) {
+        console.error("Error checking Apify API key:", err)
+        setHasApifyKey(false)
+      } finally {
+        setCheckingApify(false)
+      }
+    }
+    
+    if (isOpen && user) {
+      checkApifyKey()
+    }
+  }, [user, isOpen])
+
+  useEffect(() => {
+    if (!checkingApify && !hasApifyKey) {
+      setSearchMethod('urls')
+    }
+  }, [checkingApify, hasApifyKey])
 
   // Helper function to extract domain from URL
   const extractDomain = (url) => {
@@ -93,6 +130,10 @@ export default function SearchModal({ isOpen, onClose, onNewSearch }) {
     }
 
     if (searchMethod === 'query') {
+      if (!hasApifyKey) {
+        alert('You must add an Apify API key in settings to perform query searches')
+        return
+      }
       if (keywordsArray.length === 0 && locationsArray.length === 0) {
         alert('Please enter either keywords, locations, or both')
         return
@@ -292,18 +333,40 @@ export default function SearchModal({ isOpen, onClose, onNewSearch }) {
           </button>
         </div>
 
+        {/* Warning banner when Apify keys are missing */}
+        {!hasApifyKey && !checkingApify && (
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3 text-xs text-amber-850 shadow-sm">
+            <FaKey className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <span className="font-semibold block text-amber-900 mb-0.5">Apify API Key Required</span>
+              You must add at least one Apify API Key to perform search queries.
+              {" "}<a href="/dashboard/settings" className="font-semibold text-teal-700 hover:underline">Go to Settings</a> to configure your credentials.
+            </div>
+          </div>
+        )}
+
         {/* Search Method Tabs */}
         <div className="flex mb-6 border-b border-gray-200">
           <button
             type="button"
+            disabled={!hasApifyKey || checkingApify}
             onClick={() => setSearchMethod('query')}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-all ${searchMethod === 'query'
-              ? 'border-teal-600 text-teal-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-all ${
+              !hasApifyKey
+                ? 'opacity-50 cursor-not-allowed border-transparent text-gray-400'
+                : searchMethod === 'query'
+                  ? 'border-teal-600 text-teal-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+            title={!hasApifyKey ? "Please add an Apify API key in settings to enable query search" : ""}
           >
             <FaSearch className="h-4 w-4" />
             Search by Queries
+            {!hasApifyKey && !checkingApify && (
+              <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-semibold flex items-center gap-0.5">
+                <FaKey className="h-2.5 w-2.5" /> Locked
+              </span>
+            )}
           </button>
           <button
             type="button"

@@ -28,32 +28,40 @@ async function runGoogleMapsScraper(client, input) {
 
 
 
-async function fetchAllPages(keyword, locations) {
+async function fetchAllPages(keyword, locations, apiKeys) {
+  let lastError = null;
 
-  let apify_api_key = "apify_api_AiOr3T8tPAKedURQLNnuh7KKZEPsFw4c6Few"
-  let apify_user_id = "sRGjFaFCLzb5u9ewf"
+  for (const apiKey of apiKeys) {
+    try {
+      console.log(`🔑 Trying Apify API key: ${apiKey.substring(0, 15)}...`);
+      const client = new ApifyClient({
+        token: apiKey,
+      });
 
-  // Initialize the ApifyClient with API token
-  const client = new ApifyClient({
-    token: apify_api_key,
-  });
+      const input = {
+        "search_term": [
+          keyword
+        ],
+        "location": locations,
+        "predefined_location": "None",
+        "number_of_target_records": 200,
+        "enhanced_search": false,
+        "enrich_records_with_reviews": false,
+        "reviews_per_record": 10,
+        "reviews_sort_type": "Newest"
+      };
 
-  const input = {
-    "search_term": [
-      keyword
-    ],
-    "location": locations,
-    "predefined_location": "None",
-    "number_of_target_records": 200,
-    "enhanced_search": false,
-    "enrich_records_with_reviews": false,
-    "reviews_per_record": 10,
-    "reviews_sort_type": "Newest"
-  };
+      const result = await runGoogleMapsScraper(client, input);
+      console.log(`✅ Apify API key succeeded: ${apiKey.substring(0, 15)}...`);
+      return result;
 
-  let result = await runGoogleMapsScraper(client, input);
+    } catch (err) {
+      console.error(`❌ Apify API key failed: ${apiKey.substring(0, 15)}... Error:`, err.message || err);
+      lastError = err;
+    }
+  }
 
-  return result;
+  throw new Error(`All Apify API keys exhausted and failed. Last error: ${lastError?.message || lastError}`);
 }
 
 
@@ -84,13 +92,32 @@ export async function POST(req) {
         return NextResponse.json({ error: 'locations must be a non-empty array' }, { status: 400 });
       }
 
+      if (!user_id) {
+        return NextResponse.json({ error: 'user_id is required' }, { status: 400 });
+      }
+
+      // Fetch all active Apify API keys for this user
+      const { data: keysData, error: keysError } = await supabase
+        .from('apify_apis')
+        .select('api_key')
+        .eq('user_id', user_id)
+        .eq('staus', 'active')
+        .order('created_at', { ascending: false });
+
+      if (keysError) {
+        console.error('💥 Database query for Apify keys failed:', keysError);
+        return NextResponse.json({ error: `Failed to retrieve Apify keys: ${keysError.message}` }, { status: 500 });
+      }
+
+      if (!keysData || keysData.length === 0) {
+        return NextResponse.json({ error: 'No active Apify API keys found. Please add one in settings.' }, { status: 400 });
+      }
+
+      const activeKeys = keysData.map(k => k.api_key).filter(Boolean);
       const allResults = [];
 
-
-
-
       for (const keyword of keywords) {
-        const places = await fetchAllPages(keyword, locations);
+        const places = await fetchAllPages(keyword, locations, activeKeys);
         console.log(`   Found ${places.length} places`);
 
         if (places.length > 0) {

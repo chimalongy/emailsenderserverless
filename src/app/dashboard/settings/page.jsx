@@ -8,6 +8,7 @@ import ProfileTab from './components/ProfileTab';
 import AccountTab from './components/AccountTab';
 import SecurityTab from './components/SecurityTab';
 import QStashTab from './components/QStashTab';
+import ApifyApiTab from './components/ApifyApiTab';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile');
@@ -37,6 +38,12 @@ export default function SettingsPage() {
       icon: <FiKey className="w-4 h-4" />,
       description: 'API and integration settings'
     },
+    { 
+      id: 'apify_api', 
+      label: 'Apify API Keys', 
+      icon: <FiKey className="w-4 h-4" />,
+      description: 'Manage your Apify API keys'
+    },
   ];
 
   const renderTabContent = () => {
@@ -49,6 +56,8 @@ export default function SettingsPage() {
         return <SecurityTab />;
       case 'qstash':
         return <QStashTab />;
+      case 'apify_api':
+        return <ApifyApiTab />;
       default:
         return (
           <div className="text-center py-12">
@@ -135,6 +144,7 @@ export default function SettingsPage() {
                     {activeTab === 'account' && 'Preferences'}
                     {activeTab === 'security' && 'Protected'}
                     {activeTab === 'qstash' && 'Advanced'}
+                    {activeTab === 'apify_api' && 'Integration'}
                   </div>
                 </div>
               </div>
