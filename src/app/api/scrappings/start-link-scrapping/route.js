@@ -1,6 +1,10 @@
-import { NextResponse } from "next/server";
+import { configure } from "@trigger.dev/sdk";
 import { tasks } from "@trigger.dev/sdk";
-import { scrapeEmailsTask } from "@/trigger/scrapeEmailsTask";
+import { NextResponse } from "next/server";
+
+configure({
+  secretKey: process.env.TRIGGER_SECRET_KEY,
+});
 
 export async function POST(req) {
   try {
@@ -13,35 +17,32 @@ export async function POST(req) {
       );
     }
 
-    const { id, user_id, method, queries, urls } = scrapping;
+    const { id, user_id, urls } = scrapping;
 
-    // Only URL-based scraping for now
-    if (!urls || !Array.isArray(urls) || urls.length === 0) {
+    if (!Array.isArray(urls) || urls.length === 0) {
       return NextResponse.json(
         { error: "No URLs provided for scraping" },
         { status: 400 }
       );
     }
 
-
-    let payload = {
+    const payload = {
       scrappingId: id,
       userId: user_id,
       urls,
-    }
-   // console.log(JSON.stringify(payload))
-    // 🔥 Trigger task
-    const handle = await client.trigger(scrapeEmailsTask, payload);
+    };
+    console.log(JSON.stringify(payload));
+
+    const handle = await tasks.trigger("scrape-emails-task", payload);
 
     return NextResponse.json({
       success: true,
-      message: "Scrapping job started",
+      message: "Scraping job started",
       scrappingId: id,
       runId: handle.id,
     });
-
   } catch (err) {
-    console.error("start-scrapping error:", err);
+    console.error("start-scraping error:", err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

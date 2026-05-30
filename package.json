@@ -1,9 +1,10 @@
 {
   "dependencies": {
     "@supabase/supabase-js": "^2.84.0",
-    "@trigger.dev/sdk": "4.3.1",
+    "@trigger.dev/sdk": "4.4.6",
     "@upstash/qstash": "^2.8.4",
     "@upstash/redis": "^1.35.6",
+    "apify-client": "^2.23.3",
     "axios": "^1.13.2",
     "cheerio": "^1.1.2",
     "googleapis": "^166.0.0",
@@ -15,11 +16,12 @@
     "react-dom": "19.2.0",
     "react-hot-toast": "^2.6.0",
     "react-icons": "^5.5.0",
-    "redis": "^5.10.0"
+    "redis": "^5.10.0",
+    "typescript": "^5.9.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@trigger.dev/build": "4.3.1",
+    "@trigger.dev/build": "4.4.6",
     "@types/react": "19.2.7",
     "tailwindcss": "^4"
   },
