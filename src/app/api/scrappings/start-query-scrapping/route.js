@@ -76,13 +76,7 @@ export async function POST(req) {
     const { id, user_id, method, keywords, locations, urls, name } = scrapping || {};
 
     console.log('🚀 Scraping request received:');
-    console.log(' - Scrapping ID:', id);
-    console.log(' - User ID:', user_id);
-    console.log(' - Method:', method);
-    console.log(' - Keywords:', keywords);
-    console.log(' - Locations:', locations);
-    console.log(' - URLs:', urls);
-    console.log(' - Name:', name);
+    
 
     if (method === 'google_maps' || method === 'query') {
       if (!Array.isArray(keywords) || keywords.length === 0) {

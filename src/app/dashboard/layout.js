@@ -18,7 +18,8 @@ import {
   FaChevronRight,
   FaSearch,
   FaTools,
-  FaBriefcase // Added for Portfolio icon
+  FaBriefcase,
+  FaRobot
 } from 'react-icons/fa'
 
 export default function DashboardLayout({ children }) {
@@ -125,6 +126,12 @@ export default function DashboardLayout({ children }) {
       description: 'Find and scrape email addresses'
     },
     { 
+      name: 'Automate', 
+      href: '/dashboard/automate', 
+      icon: <FaRobot className="w-5 h-5" />,
+      description: 'Automated scraping and tasks'
+    },
+    { 
       name: 'Utils', 
       href: '/dashboard/utils', 
       icon: <FaTools className="w-5 h-5" />,
@@ -143,6 +150,7 @@ export default function DashboardLayout({ children }) {
     if (pathname === '/dashboard/outbounds') return 'Campaigns'
     if (pathname === '/dashboard/settings') return 'Settings'
     if (pathname === '/dashboard/scrape-emails') return 'Scrape Emails'
+    if (pathname === '/dashboard/automate') return 'Automate'
     if (pathname === '/dashboard/utils') return 'Utils'
     return pathname.split('/').pop()?.replace(/-/g, ' ') || ''
   }
@@ -414,6 +422,7 @@ export default function DashboardLayout({ children }) {
                   {pathname === '/dashboard/outbounds' && 'Create and manage your outreach campaigns'}
                   {pathname === '/dashboard/settings' && 'Manage your account settings'}
                   {pathname === '/dashboard/scrape-emails' && 'Find and scrape email addresses for your campaigns'}
+                  {pathname === '/dashboard/automate' && 'Configure and run automated scraping tasks'}
                   {pathname === '/dashboard/utils' && 'Tools and utilities to enhance your workflow'}
                 </p>
               </div>

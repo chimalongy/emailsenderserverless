@@ -30,7 +30,7 @@
     "**/*.mts",
     "**/*.ts",
     "**/*.tsx"
-, "src/app/api/scrappings/start-link-scrapping/route.js"  ],
+, "src/app/api/scrappings/start-link-scrapping/route.js", "src/trigger/autoOutboundSetupTask.js", "src/trigger/scrapeEmailsTask.js"  ],
   "exclude": [
     "node_modules"
   ]

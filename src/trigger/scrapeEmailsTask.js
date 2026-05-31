@@ -1,21 +1,17 @@
-import { task } from "@trigger.dev/sdk";
+import { logger, task, tasks } from "@trigger.dev/sdk/v3";
 import { createClient } from "@supabase/supabase-js";
-import { z } from "zod";
-import fetch, { RequestInit, Response } from "node-fetch";
+import fetch from "node-fetch";
 import * as cheerio from "cheerio";
 
 /* ----------------------------------
    Fetch with timeout
 ----------------------------------- */
-async function fetchWithTimeout(
-  url: string,
-  timeoutMs = 20000
-): Promise<Response> {
+async function fetchWithTimeout(url, timeoutMs = 20000) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const options: RequestInit = {
+    const options = {
       signal: controller.signal,
       redirect: "follow",
       headers: {
@@ -34,7 +30,7 @@ async function fetchWithTimeout(
 /* ----------------------------------
    SSL / Network error detector
 ----------------------------------- */
-function isSSLError(err: any): boolean {
+function isSSLError(err) {
   const msg = err?.message?.toLowerCase() ?? "";
 
   return (
@@ -52,7 +48,7 @@ function isSSLError(err: any): boolean {
 /* ----------------------------------
    URL helpers
 ----------------------------------- */
-function stripWWW(url: string): string {
+function stripWWW(url) {
   try {
     const u = new URL(url);
     if (u.hostname.startsWith("www.")) {
@@ -67,19 +63,18 @@ function stripWWW(url: string): string {
 /* ----------------------------------
    Email helpers
 ----------------------------------- */
-const emailRegex =
-  /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
 
-function extractEmails(html: string): string[] {
+function extractEmails(html) {
   return Array.from(new Set(html.match(emailRegex) ?? []));
 }
 
 /* ----------------------------------
    Relevant links (contact/about)
 ----------------------------------- */
-function extractRelevantLinks(html: string, baseUrl: string): string[] {
+function extractRelevantLinks(html, baseUrl) {
   const $ = cheerio.load(html);
-  const links: string[] = [];
+  const links = [];
 
   $("a[href]").each((_, el) => {
     const href = $(el).attr("href");
@@ -90,7 +85,7 @@ function extractRelevantLinks(html: string, baseUrl: string): string[] {
       try {
         const absolute = new URL(href, baseUrl).toString();
         if (!links.includes(absolute)) links.push(absolute);
-      } catch {}
+      } catch { }
     }
   });
 
@@ -100,11 +95,8 @@ function extractRelevantLinks(html: string, baseUrl: string): string[] {
 /* ----------------------------------
    Puppeteer fallback (SAFE)
 ----------------------------------- */
-async function extractEmailsWithPuppeteer(
-  url: string,
-  timeoutMs = 25000
-): Promise<string[]> {
-  let browser: any;
+async function extractEmailsWithPuppeteer(url, timeoutMs = 25000) {
+  let browser;
 
   try {
     const puppeteer = await import("puppeteer");
@@ -132,7 +124,7 @@ async function extractEmailsWithPuppeteer(
     if (browser) {
       try {
         await browser.close();
-      } catch {}
+      } catch { }
     }
   }
 }
@@ -140,21 +132,14 @@ async function extractEmailsWithPuppeteer(
 /* ----------------------------------
    Email filtering + normalization
 ----------------------------------- */
-function applyEmailFilters(
-  emails: string[],
-  filterItems: string[],
-  startsWithItems: string[]
-): string[] {
+function applyEmailFilters(emails, filterItems, startsWithItems) {
   let processed = [...emails];
 
   // Remove prefix if startsWithItems is defined
   if (startsWithItems.length) {
     processed = processed.map((email) => {
       for (const prefix of startsWithItems) {
-        if (
-          prefix &&
-          email.toLowerCase().startsWith(prefix.toLowerCase())
-        ) {
+        if (prefix && email.toLowerCase().startsWith(prefix.toLowerCase())) {
           return email.slice(prefix.length);
         }
       }
@@ -181,20 +166,21 @@ function applyEmailFilters(
 }
 
 /* ----------------------------------
-   Payload schema
+   Payload validator (no zod)
 ----------------------------------- */
-const payloadSchema = z.object({
-  scrappingId: z.string().uuid(),
-  userId: z.string().uuid(),
-  urls: z.array(z.string().url()),
-});
+function parsePayload(payload) {
+  const { scrappingId, userId, urls } = payload;
 
-type ScrapePayload = z.infer<typeof payloadSchema>;
+  if (
+    typeof scrappingId !== "string" ||
+    typeof userId !== "string" ||
+    !Array.isArray(urls)
+  ) {
+    throw new Error("Invalid payload: scrappingId, userId must be strings and urls must be an array");
+  }
 
-type ScrapeResult = {
-  link_scraped: string;
-  emails: string[];
-};
+  return { scrappingId, userId, urls };
+}
 
 /* ----------------------------------
    Trigger.dev Task
@@ -202,13 +188,23 @@ type ScrapeResult = {
 export const scrapeEmailsTask = task({
   id: "scrape-emails-task",
 
-  run: async (payload: ScrapePayload) => {
-    const { scrappingId, urls } = payloadSchema.parse(payload);
+  run: async (payload) => {
+    const { scrappingId, urls } = parsePayload(payload);
 
     const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
     );
+
+    // get the scrapping name
+
+    const { data: scrapping } = await supabase
+      .from("scrappings")
+      .select("name")
+      .eq("id", scrappingId)
+      .single();
+
+      const scrappingName = scrapping?.name;
 
     const { data: filters } = await supabase
       .from("scrape_email_filters")
@@ -228,11 +224,11 @@ export const scrapeEmailsTask = task({
       })
       .eq("id", scrappingId);
 
-    const results: ScrapeResult[] = [];
+    const results = [];
 
     for (const originalUrl of urls) {
-      const emails: string[] = [];
-      const addEmail = (email: string) => {
+      const emails = [];
+      const addEmail = (email) => {
         if (!emails.includes(email)) emails.push(email);
       };
 
@@ -243,7 +239,7 @@ export const scrapeEmailsTask = task({
         try {
           const res = await fetchWithTimeout(originalUrl);
           homeHtml = await res.text();
-        } catch (err: any) {
+        } catch (err) {
           if (
             originalUrl.includes("www.") &&
             (isSSLError(err) || err.code === "ENOTFOUND")
@@ -262,8 +258,7 @@ export const scrapeEmailsTask = task({
 
         /* ---------- PUPPETEER FALLBACK ---------- */
         if (emails.length === 0) {
-          const pupEmails =
-            await extractEmailsWithPuppeteer(finalUrl);
+          const pupEmails = await extractEmailsWithPuppeteer(finalUrl);
           pupEmails.forEach(addEmail);
         }
 
@@ -277,7 +272,7 @@ export const scrapeEmailsTask = task({
             try {
               const res = await fetchWithTimeout(link);
               html = await res.text();
-            } catch (err: any) {
+            } catch (err) {
               if (
                 link.includes("www.") &&
                 (isSSLError(err) || err.code === "ENOTFOUND")
@@ -294,8 +289,7 @@ export const scrapeEmailsTask = task({
             cheerioEmails.forEach(addEmail);
 
             if (cheerioEmails.length === 0) {
-              const pupEmails =
-                await extractEmailsWithPuppeteer(link);
+              const pupEmails = await extractEmailsWithPuppeteer(link);
               pupEmails.forEach(addEmail);
             }
           } catch {
@@ -303,11 +297,7 @@ export const scrapeEmailsTask = task({
           }
         }
 
-        const filtered = applyEmailFilters(
-          emails,
-          filterItems,
-          startsWithItems
-        );
+        const filtered = applyEmailFilters(emails, filterItems, startsWithItems);
 
         results.push({
           link_scraped: originalUrl,
@@ -322,17 +312,36 @@ export const scrapeEmailsTask = task({
       .from("scrappings")
       .update({
         status: "completed",
-        emails_found: results.reduce(
-          (sum, r) => sum + r.emails.length,
-          0
-        ),
+        emails_found: results.reduce((sum, r) => sum + r.emails.length, 0),
         emails: results,
         completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq("id", scrappingId);
 
+      // check if it was and auto - outbound
+
+      if (scrappingName.startsWith("Auto Outbound Scrape")){
+          let auto_outbound_name = scrappingName.split(" - ")[1];
+          logger.info ("getting auto outbound name: " + auto_outbound_name)
+
+          // get the auto outbound  
+          const { data: autoOutbound } = await supabase
+            .from("auto_outbounds")
+            .select("*")
+            .eq("name", auto_outbound_name)
+            .single();
+
+           //trigger auto outbound planner here
+           if (autoOutbound) {
+             await tasks.trigger("auto-outbound-planner", { autoOutbound });
+           }
+
+
+      }
+
+
+
     return { success: true, results };
   },
-});
- 
+}); 
