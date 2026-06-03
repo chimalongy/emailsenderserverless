@@ -235,6 +235,12 @@ export async function POST(request) {
       })
       .eq('id', account.id)
 
+    // Update task status if applicable
+    const targetTaskId = task_id || email?.task_id
+    if (targetTaskId) {
+      await updateTaskStatus(targetTaskId)
+    }
+
     console.log(`✅ Email sent successfully to ${email.recipient}`)
 
     return NextResponse.json({ 
@@ -256,6 +262,22 @@ export async function POST(request) {
             sent_at: new Date().toISOString()
           })
           .eq('id', email_id)
+
+        // Try to update task status on failure too
+        let targetTaskId = task_id || (email && email.task_id)
+        if (!targetTaskId) {
+          const { data: queueRow } = await supabase
+            .from('email_queue')
+            .select('task_id')
+            .eq('id', email_id)
+            .maybeSingle()
+          if (queueRow) {
+            targetTaskId = queueRow.task_id
+          }
+        }
+        if (targetTaskId) {
+          await updateTaskStatus(targetTaskId)
+        }
       } catch (updateError) {
         console.error('Failed to update email status:', updateError)
       }
@@ -271,3 +293,64 @@ export async function POST(request) {
     )
   }
 }
+
+async function updateTaskStatus(taskId) {
+  if (!taskId) return
+
+  try {
+    // 1. Get current task status
+    const { data: task, error: taskError } = await supabase
+      .from('tasks')
+      .select('status')
+      .eq('id', taskId)
+      .maybeSingle()
+
+    if (taskError || !task) {
+      console.error('Error fetching task for status update:', taskError)
+      return
+    }
+
+    // 2. If the task is still 'scheduled', update it to 'in_progress'
+    if (task.status === 'scheduled') {
+      const { error: updateError } = await supabase
+        .from('tasks')
+        .update({ status: 'in_progress' })
+        .eq('id', taskId)
+      
+      if (updateError) {
+        console.error('Error updating task status to in_progress:', updateError)
+      } else {
+        console.log(`Task ${taskId} status updated to in_progress`)
+      }
+    }
+
+    // 3. Check if there are any remaining scheduled/pending emails for this task
+    const { data: remainingEmails, error: remainingError } = await supabase
+      .from('email_queue')
+      .select('id')
+      .eq('task_id', taskId)
+      .in('status', ['scheduled', 'pending'])
+      .limit(1)
+
+    if (remainingError) {
+      console.error('Error checking remaining emails:', remainingError)
+      return
+    }
+
+    // If no remaining scheduled/pending emails, update task status to 'completed'
+    if (!remainingEmails || remainingEmails.length === 0) {
+      const { error: updateError } = await supabase
+        .from('tasks')
+        .update({ status: 'completed' })
+        .eq('id', taskId)
+
+      if (updateError) {
+        console.error('Error updating task status to completed:', updateError)
+      } else {
+        console.log(`Task ${taskId} status updated to completed`)
+      }
+    }
+  } catch (err) {
+    console.error('Error in updateTaskStatus:', err)
+  }
+}

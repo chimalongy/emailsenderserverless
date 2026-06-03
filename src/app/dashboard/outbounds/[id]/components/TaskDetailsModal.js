@@ -35,9 +35,11 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
 
   const statusColors = {
     completed: "bg-emerald-500",
+    complete: "bg-emerald-500",
     failed: "bg-rose-500",
     pending: "bg-amber-500",
     in_progress: "bg-teal-500",
+    processing: "bg-teal-500",
   };
 
   // Fetch emails when accordion is opened
@@ -465,11 +467,11 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
               <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="p-1.5 bg-teal-100 rounded">
-                    {task.status === "completed" ? (
+                    {task.status === "completed" || task.status === "complete" ? (
                       <FaCheckCircle className="w-4 h-4 text-teal-600" />
                     ) : task.status === "failed" ? (
                       <FaTimesCircle className="w-4 h-4 text-rose-600" />
-                    ) : task.status === "pending" ? (
+                    ) : (task.status === "pending" || task.status === "scheduled") ? (
                       <FaClock className="w-4 h-4 text-amber-600" />
                     ) : (
                       <FaSpinner className="w-4 h-4 text-teal-600 animate-spin" />
@@ -478,10 +480,12 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
                   <span className="text-sm font-medium text-gray-600">Status</span>
                 </div>
                 <span className={`px-2 py-1 rounded text-sm font-semibold capitalize ${
-                  task.status === "completed"
+                  (task.status === "completed" || task.status === "complete")
                     ? "bg-emerald-100 text-emerald-700"
                     : task.status === "failed"
                     ? "bg-rose-100 text-rose-700"
+                    : (task.status === "scheduled" || task.status === "pending")
+                    ? "bg-blue-100 text-blue-700"
                     : "bg-amber-100 text-amber-700"
                 }`}>
                   {task.status.replace("_", " ")}

@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import {
 
     buildGetDomainQueriesPrompt,
+    buildAutoOutboundPlannerPrompt,
 } from "./prompts.js";
 import { getLLMAPIs } from "./getllmapis.js";
 
@@ -184,6 +185,17 @@ export async function llmGetDomainQueries({ domain }) {
     const { systemPrompt, userPrompt } = buildGetDomainQueriesPrompt({ domain });
     let result = await callLLM(systemPrompt, userPrompt);
     console.log("result of Get Domain Queries: ", result);
+    return result;
+}
+
+/**
+ * @param {object} params
+ * @returns {Promise<object>}
+ */
+export async function llmPlanAutoOutbound(params) {
+    const { systemPrompt, userPrompt } = buildAutoOutboundPlannerPrompt(params);
+    let result = await callLLM(systemPrompt, userPrompt);
+    console.log("result of Auto Outbound Planner: ", result);
     return result;
 }
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '../../lib/supabase'
+
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { FaSignInAlt, FaUserPlus, FaEnvelope, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa'
@@ -20,14 +20,22 @@ export default function LoginPage() {
     setError('')
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
       })
 
-      if (error) throw error
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to login')
+      }
       
-      router.push('/dashboard')
+      // Use full page reload to ensure auth state updates
+      window.location.href = '/dashboard';
     } catch (error) {
       setError(error.message)
     } finally {

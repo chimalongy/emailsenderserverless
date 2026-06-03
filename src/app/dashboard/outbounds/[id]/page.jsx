@@ -57,7 +57,9 @@ const TaskStatusBadge = ({ status }) => {
   const config = {
     scheduled: { color: 'bg-blue-50 text-blue-700', icon: FiClock },
     in_progress: { color: 'bg-amber-50 text-amber-700', icon: FiRefreshCw },
+    processing: { color: 'bg-amber-50 text-amber-700', icon: FiRefreshCw },
     completed: { color: 'bg-emerald-50 text-emerald-700', icon: FiCheckCircle },
+    complete: { color: 'bg-emerald-50 text-emerald-700', icon: FiCheckCircle },
     failed: { color: 'bg-red-50 text-red-700', icon: FiAlertCircle },
     paused: { color: 'bg-gray-50 text-gray-700', icon: FiPauseCircle },
   }
@@ -269,8 +271,8 @@ export default function OutboundDetailPage() {
   // Calculate stats for tasks
   const taskStats = {
     total: tasks.length,
-    completed: tasks.filter(t => t.status === 'completed').length,
-    in_progress: tasks.filter(t => t.status === 'in_progress').length,
+    completed: tasks.filter(t => t.status === 'completed' || t.status === 'complete').length,
+    in_progress: tasks.filter(t => t.status === 'in_progress' || t.status === 'processing').length,
     scheduled: tasks.filter(t => t.status === 'scheduled').length,
   }
 

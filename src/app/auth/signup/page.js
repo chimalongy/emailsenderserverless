@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '../../lib/supabase'
+
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { FaUserPlus, FaSignInAlt, FaEnvelope, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa'
@@ -20,12 +20,19 @@ export default function SignupPage() {
     setError('')
 
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
       })
 
-      if (error) throw error
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to sign up')
+      }
       
       alert('Signup successful! You can now login.')
       router.push('/auth/login')
