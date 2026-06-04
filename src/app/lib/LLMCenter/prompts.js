@@ -57,6 +57,7 @@ HOW OUTBOUNDING IS CARRIED OUT:
 4. You are provided with multiple Gmail sending accounts as SENDING_GMAIL_ACCOUNTS. Each has a daily limit, daily sent count today, and app password.
 5. You are to allocate prospects from END_USERS_LIST to SENDING_GMAIL_ACCOUNTS sequentially based on their remaining daily limits. Remaining daily capacity = daily_limit - sent_today. Do not exceed the capacity of any account.
 6. The database stores the last allocated email in public.users.last_allocated_email, and any unallocated emails as a comma-separated string in public.users.last_allocated_email_remainder.
+7. The sendingrate must be a number between 16 and 25.
 
 EMAIL SCHEDULING (TASKS):
 You must plan exactly 4 tasks (Task 1, Task 2, Task 3, Task 4) representing a campaign sequence:
@@ -82,7 +83,7 @@ Rules for rewriting:
    - For Task 2 and 3: the domain name must be all lowercase and without spaces (e.g., "sandiegoplumber.com").
 3. For follow-ups (Task 2, Task 3, Task 4), you must use the EXACT SAME subject line as Task 1. This ensures that the follow-ups thread correctly in the recipient's inbox.
 4. Replace \`{price}\` with the provided price (${price}).
-5. Replace \`[Signature here]\` with the sender's signature/name or a placeholder if not present.
+5. The body of the email must NEVER contain the Subject.
 
 OUTPUT FORMAT:
 Always respond with a single valid JSON object. Do not wrap the JSON in markdown code blocks (such as \`\`\`json). Do not add any conversational text before or after the JSON.
@@ -153,4 +154,4 @@ ${JSON.stringify(existingTasks, null, 2)}
   `.trim();
 
   return { systemPrompt, userPrompt };
-} 0
+} 

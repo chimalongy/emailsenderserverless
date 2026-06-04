@@ -12,7 +12,6 @@ export const first_outbound_email_templates = [
     Would you be intrested in acquirng the domain name TheDomainName .com? // notice the space between the domain and its extension
     
     Best regards,
-    [Signature here]
     `,
     `
     Hello,
@@ -40,7 +39,6 @@ Priced at {price} on GoDaddy. To get it, visit sanfranciscofootandankle.com (not
         
         
         Best regards,
-        [Signature here]
         `,
 
 ]

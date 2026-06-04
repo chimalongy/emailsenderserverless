@@ -124,7 +124,8 @@ export const autoOutboundPlannerTask = task({
         })),
         existingTasks: existingTasks || [],
         lastAllocatedEmail: userData.last_allocated_email || "",
-        startDate: autoOutbound.start_date
+        startDate: autoOutbound.start_date,
+        price: autoOutbound.price || undefined
       });
 
       if (!result || !result.allocations || !result.tasks) {

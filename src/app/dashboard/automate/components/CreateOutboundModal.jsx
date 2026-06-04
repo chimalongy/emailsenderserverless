@@ -17,6 +17,7 @@ export default function CreateOutboundModal({ isOpen, onClose, onCreate }) {
   const [selectedDomain, setSelectedDomain] = useState('');
   const [startDate, setStartDate] = useState('');
   const [automationName, setAutomationName] = useState('');
+  const [offerPrice, setOfferPrice] = useState('$1,995');
 
   // Data state
   const [domains, setDomains] = useState([]);
@@ -64,6 +65,7 @@ export default function CreateOutboundModal({ isOpen, onClose, onCreate }) {
       setSelectedDomain('');
       setStartDate('');
       setAutomationName('');
+      setOfferPrice('$1,995');
       setDomainError(null);
       setNameError(null);
       setSubmitError(null);
@@ -88,6 +90,11 @@ export default function CreateOutboundModal({ isOpen, onClose, onCreate }) {
       return;
     }
 
+    if (!offerPrice.trim()) {
+      alert('Please enter an offer price.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       // Get current session token
@@ -107,6 +114,7 @@ export default function CreateOutboundModal({ isOpen, onClose, onCreate }) {
           name: automationName.trim(),
           domain: selectedDomain,
           startDate,
+          price: offerPrice.trim(),
         }),
       });
 
@@ -126,6 +134,7 @@ export default function CreateOutboundModal({ isOpen, onClose, onCreate }) {
         domain: selectedDomain,
         startDate,
         name: automationName.trim(),
+        price: offerPrice.trim(),
         apiData: result.data,
       });
       onClose();
@@ -287,6 +296,24 @@ export default function CreateOutboundModal({ isOpen, onClose, onCreate }) {
             </p>
           </div>
 
+          {/* Offer Price */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              Offer Price <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={offerPrice}
+              onChange={(e) => setOfferPrice(e.target.value)}
+              placeholder="e.g. $1,995"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all placeholder:text-gray-400"
+              required
+            />
+            <p className="text-xs text-gray-500 mt-1.5">
+              The price at which the domain will be offered.
+            </p>
+          </div>
+
           {/* General submit error */}
           {submitError && (
             <div className="flex items-start gap-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
@@ -310,7 +337,7 @@ export default function CreateOutboundModal({ isOpen, onClose, onCreate }) {
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || loadingDomains || !selectedDomain || !startDate || !automationName.trim()}
+              disabled={isSubmitting || loadingDomains || !selectedDomain || !startDate || !automationName.trim() || !offerPrice.trim()}
               className="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600 rounded-xl shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all"
             >
               {isSubmitting ? (

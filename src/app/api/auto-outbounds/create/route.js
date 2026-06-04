@@ -46,7 +46,7 @@ export async function POST(request) {
 
     // ── 2. Parse body ─────────────────────────────────────────────────────────
     const body = await request.json();
-    const { name, domain, startDate } = body;
+    const { name, domain, startDate, price } = body;
 
     if (!name?.trim()) {
       return NextResponse.json(
@@ -63,6 +63,12 @@ export async function POST(request) {
     if (!startDate) {
       return NextResponse.json(
         { success: false, error: 'A start date is required.' },
+        { status: 400 }
+      );
+    }
+    if (!price?.trim()) {
+      return NextResponse.json(
+        { success: false, error: 'An offer price is required.' },
         { status: 400 }
       );
     }
@@ -105,6 +111,7 @@ export async function POST(request) {
         status: 'active',
         emails_sent: 0,
         campaigns_completed: 0,
+        price: price.trim(),
       })
       .select()
       .single();

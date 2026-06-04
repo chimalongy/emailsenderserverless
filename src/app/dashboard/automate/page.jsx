@@ -188,6 +188,12 @@ export default function AutomatePage() {
                       <FaBullseye className="text-gray-400 flex-shrink-0" />
                       <span><strong className="text-gray-700">Domain:</strong> {automation.domain}</span>
                     </div>
+                    {automation.price && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-gray-400 font-bold flex-shrink-0 text-center w-3.5">$</span>
+                        <span><strong className="text-gray-700">Offer Price:</strong> {automation.price}</span>
+                      </div>
+                    )}
                     <div className="flex items-center gap-1.5">
                       <FaClock className="text-gray-400 flex-shrink-0" />
                       <span><strong className="text-gray-700">Start Date:</strong> {formatDate(automation.start_date)}</span>
