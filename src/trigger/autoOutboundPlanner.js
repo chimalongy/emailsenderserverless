@@ -168,9 +168,30 @@ export const autoOutboundPlannerTask = task({
         return { success: true, message: "No prospects allocated in this run." };
       }
 
-      // 9. Save Tasks to Database
+      // 9. Create a new campaign in outbounds table
+      logger.info(`📝 Creating new campaign in outbounds table...`);
+      const { data: createdOutbound, error: outboundInsertError } = await supabase
+        .from("outbounds")
+        .insert({
+          user_id: autoOutbound.user_id,
+          name: autoOutbound.name,
+          status: "active",
+          email_list: allocatedProspects.join("\n"),
+          allocations: result.allocations,
+        })
+        .select()
+        .single();
+
+      if (outboundInsertError || !createdOutbound) {
+        logger.error("💥 Error creating campaign in outbounds table:", outboundInsertError);
+        return { success: false, error: "Failed to create campaign in outbounds table" };
+      }
+
+      logger.info(`✅ Created campaign "${createdOutbound.name}" (ID: ${createdOutbound.id}) in outbounds table.`);
+
+      // 10. Save Tasks to Database
       const tasksToInsert = result.tasks.map(t => ({
-        outbound_id: autoOutbound.id,
+        outbound_id: createdOutbound.id,
         name: t.name,
         type: t.type,
         body: t.body,
@@ -193,7 +214,7 @@ export const autoOutboundPlannerTask = task({
 
       logger.info(`✅ Created ${createdTasks.length} tasks in the database.`);
 
-      // 10. Generate and insert Email Queue entries for all tasks
+      // 11. Generate and insert Email Queue entries for all tasks
       const emailQueueEntries = [];
       createdTasks.forEach(task => {
         let emailIndex = 0;
@@ -202,7 +223,7 @@ export const autoOutboundPlannerTask = task({
           for (let i = 0; i < allocatedCount && emailIndex < allocatedProspects.length; i++) {
             emailQueueEntries.push({
               user_id: autoOutbound.user_id,
-              outbound_id: autoOutbound.id,
+              outbound_id: createdOutbound.id,
               task_id: task.id,
               account_id: allocation.account_id,
               recipient: allocatedProspects[emailIndex],
