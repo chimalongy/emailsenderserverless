@@ -1,7 +1,6 @@
 import { task, logger } from "@trigger.dev/sdk/v3";
 import { createClient } from "@supabase/supabase-js";
 import { llmPlanAutoOutbound } from "../app/lib/LLMCenter/LLM-central.js";
-import { scheduleEmail } from "../app/lib/qstash.js";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -228,63 +227,8 @@ export const autoOutboundPlannerTask = task({
 
       logger.info(`✅ Created ${emailQueueEntries.length} email queue entries.`);
 
-      // 11. Schedule the emails with QStash for each task
-      for (const task of createdTasks) {
-        const { data: pendingEmails, error: pendingFetchError } = await supabase
-          .from("email_queue")
-          .select("id, status, recipient")
-          .eq("task_id", task.id);
-
-        if (pendingFetchError || !pendingEmails) {
-          logger.error(`💥 Error fetching pending emails for task ${task.id}:`, pendingFetchError);
-          continue;
-        }
-
-        logger.info(`🚀 Scheduling ${pendingEmails.length} emails for task "${task.name}"...`);
-
-        const baseTime = new Date(task.scheduled_at).getTime();
-        const sendRate = task.send_rate || 5;
-        const now = Date.now();
-
-        for (let i = 0; i < pendingEmails.length; i++) {
-          const email = pendingEmails[i];
-          const delay = i * sendRate * 1000;
-          const scheduledTime = baseTime + delay;
-
-          try {
-            if (scheduledTime > now) {
-              await scheduleEmail(email.id, task.id, scheduledTime, autoOutbound.user_id);
-              await supabase
-                .from("email_queue")
-                .update({
-                  scheduled_at: new Date(scheduledTime).toISOString(),
-                  status: "scheduled"
-                })
-                .eq("id", email.id);
-            } else {
-              await supabase
-                .from("email_queue")
-                .update({
-                  status: "failed",
-                  error_message: "Scheduled time in the past"
-                })
-                .eq("id", email.id);
-            }
-          } catch (schedErr) {
-            logger.error(`❌ Failed to schedule email ${email.id} for task ${task.id}:`, schedErr);
-            await supabase
-              .from("email_queue")
-              .update({
-                status: "failed",
-                error_message: schedErr.message || "Failed to schedule with QStash"
-              })
-              .eq("id", email.id);
-          }
-        }
-      }
-
       logger.info("🎉 Auto outbound planning completed successfully!");
-      return { success: true, message: "Campaign planned and scheduled successfully." };
+      return { success: true, message: "Campaign planned and tasks saved as scheduled successfully." };
 
     } catch (err) {
       logger.error("💥 Unexpected error in autoOutboundPlannerTask:", err);

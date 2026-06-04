@@ -2,12 +2,17 @@ import { Client } from '@upstash/qstash'
 import { createClient } from '@supabase/supabase-js'
 
 // --- Supabase setup ---
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Supabase URL or ANON KEY not defined')
+let supabaseInstance = null
+const getSupabase = () => {
+  if (supabaseInstance) return supabaseInstance
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Supabase URL or ANON KEY not defined')
+  }
+  supabaseInstance = createClient(supabaseUrl, supabaseAnonKey)
+  return supabaseInstance
 }
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // --- Get public base URL ---
 const getPublicBaseUrl = () => {
@@ -43,7 +48,7 @@ const getPublicBaseUrl = () => {
 
 // --- Fetch active QStash token sets for a specific user ---
 const getActiveQstashTokens = async (userId) => {
-  const { data: tokens, error } = await supabase
+  const { data: tokens, error } = await getSupabase()
     .from('qstash_tokens')
     .select('*')
     .eq('active', true)
