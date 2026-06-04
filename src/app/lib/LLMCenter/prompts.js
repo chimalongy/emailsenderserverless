@@ -36,6 +36,7 @@ export function buildAutoOutboundPlannerPrompt({
   sendingGmailAccounts,
   existingTasks,
   lastAllocatedEmail,
+  lastAllocatedEmailRemainder = 0,
   startDate,
   price = "$1,995"
 }) {
@@ -55,8 +56,11 @@ HOW OUTBOUNDING IS CARRIED OUT:
 2. Target businesses are identified using keywords + locations, and their website URLs are collected.
 3. Prospects' emails are scraped from the website URLs. This list of prospective buyers is provided to you as END_USERS_LIST.
 4. You are provided with multiple Gmail sending accounts as SENDING_GMAIL_ACCOUNTS. Each has a daily limit, daily sent count today, and app password.
-5. You are to allocate prospects from END_USERS_LIST to SENDING_GMAIL_ACCOUNTS sequentially based on their remaining daily limits. Remaining daily capacity = daily_limit - sent_today. Do not exceed the capacity of any account.
-6. The database stores the last allocated email in public.users.last_allocated_email, and any unallocated emails as a comma-separated string in public.users.last_allocated_email_remainder.
+5. You are to allocate prospects from END_USERS_LIST to SENDING_GMAIL_ACCOUNTS sequentially.
+   - If a previous run left a remainder (LAST_ALLOCATED_EMAIL_REMAINDER > 0) on the last used sending account (LAST_ALLOCATED_EMAIL), you should first allocate prospects to that account up to its remaining capacity.
+   - Otherwise, or once that remainder is satisfied, proceed to allocate prospects to the next active SENDING_GMAIL_ACCOUNTS sequentially.
+   - Daily Capacity per account = daily_limit - sent_today. Never exceed the capacity of any account.
+6. The database stores the last used sending account email in public.users.last_allocated_email, and its remaining capacity (daily capacity minus allocated count in this run) in public.users.last_allocated_email_remainder.
 7. The sendingrate must be a number between 16 and 25.
 
 EMAIL SCHEDULING (TASKS):
@@ -130,8 +134,8 @@ Expected JSON Structure:
       "send_rate": 5
     }
   ],
-  "last_allocated_email": "email@example.com",
-  "last_allocated_email_remainder": "unallocated1@example.com,unallocated2@example.com,..."
+  "last_allocated_email": "last_sender_email@gmail.com",
+  "last_allocated_email_remainder": 25
 }
   `.trim();
 
@@ -141,7 +145,8 @@ Analyze the target domain and plan the outbound campaign. Here is the input data
 Domain: ${domain}
 Start Date: ${startDate}
 Offer Price: ${price}
-Last Allocated Email (Previous): ${lastAllocatedEmail}
+Last Used Sending Email (Previous): ${lastAllocatedEmail}
+Remaining Capacity of Last Used Sender: ${lastAllocatedEmailRemainder}
 
 END_USERS_LIST (Scraped prospective buyer emails):
 ${JSON.stringify(endUsersList, null, 2)}

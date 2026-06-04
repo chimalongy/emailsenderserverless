@@ -69,20 +69,23 @@ export const autoOutboundPlannerTask = task({
         return { success: false, error: "Failed to fetch user data" };
       }
 
-      let prospectsToAllocate = [];
-      if (userData.last_allocated_email_remainder) {
-        prospectsToAllocate = userData.last_allocated_email_remainder
-          .split(",")
-          .map(e => e.trim())
-          .filter(Boolean);
-      }
-      if (prospectsToAllocate.length === 0) {
-        prospectsToAllocate = emailsList;
+      // 2b. Fetch already queued/sent email recipients for this user to avoid duplication
+      const { data: queuedEmails, error: queueFetchError } = await supabase
+        .from("email_queue")
+        .select("recipient")
+        .eq("user_id", autoOutbound.user_id);
+
+      if (queueFetchError) {
+        logger.error("💥 Error fetching queued emails:", queueFetchError);
+        return { success: false, error: "Failed to fetch queued emails" };
       }
 
+      const queuedSet = new Set(queuedEmails ? queuedEmails.map(q => q.recipient.trim().toLowerCase()) : []);
+      const prospectsToAllocate = emailsList.filter(email => !queuedSet.has(email));
+
       if (prospectsToAllocate.length === 0) {
-        logger.warn("⚠️ No prospects available to allocate.");
-        return { success: false, error: "No prospects to allocate" };
+        logger.warn("⚠️ No prospects available to allocate (all prospects in this scrape run have already been queued/sent).");
+        return { success: true, message: "No new prospects to allocate." };
       }
 
       // 3. Fetch active sending email accounts
@@ -124,6 +127,7 @@ export const autoOutboundPlannerTask = task({
         })),
         existingTasks: existingTasks || [],
         lastAllocatedEmail: userData.last_allocated_email || "",
+        lastAllocatedEmailRemainder: parseInt(userData.last_allocated_email_remainder) || 0,
         startDate: autoOutbound.start_date,
         price: autoOutbound.price || undefined
       });

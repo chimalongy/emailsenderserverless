@@ -175,11 +175,10 @@ export default function AutomatePage() {
                     <h4 className="font-semibold text-gray-800 text-sm sm:text-base group-hover:text-teal-700 transition-colors truncate">
                       {automation.name}
                     </h4>
-                    <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase ${
-                      automation.status === 'active'
+                    <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase ${automation.status === 'active'
                         ? 'bg-green-100 text-green-800 border border-green-200'
                         : 'bg-gray-100 text-gray-600 border border-gray-200'
-                    }`}>
+                      }`}>
                       {automation.status}
                     </span>
                   </div>
@@ -225,11 +224,10 @@ export default function AutomatePage() {
                   </button>
                   <button
                     onClick={(e) => toggleStatus(e, automation)}
-                    className={`p-1.5 rounded-lg transition-colors ${
-                      automation.status === 'active'
+                    className={`p-1.5 rounded-lg transition-colors ${automation.status === 'active'
                         ? 'text-teal-600 hover:bg-teal-50'
                         : 'text-gray-400 hover:bg-gray-50'
-                    }`}
+                      }`}
                     title={automation.status === 'active' ? 'Deactivate schedule' : 'Activate schedule'}
                   >
                     {automation.status === 'active' ? (
