@@ -58,13 +58,17 @@ export async function POST(request) {
     }
 
     if (!email) {
-      console.error(`Email not found. Query details:`, {
+      console.log(`Email not found (possibly deleted). Query details:`, {
         table: 'email_queue',
         column: 'id',
         value: email_id,
         task_id: task_id
       })
-      throw new Error(`Email with id ${email_id} not found in database. It may have been deleted or never created. Please check if the email_queue table has an 'id' column.`)
+      return NextResponse.json({
+        success: true,
+        message: 'Email not found in database. Skipping send (campaign or recipient may have been deleted).',
+        skipped: true
+      })
     }
 
     // Only send emails that are still scheduled.
