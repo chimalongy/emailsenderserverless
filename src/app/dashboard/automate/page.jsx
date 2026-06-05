@@ -176,8 +176,8 @@ export default function AutomatePage() {
                       {automation.name}
                     </h4>
                     <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase ${automation.status === 'active'
-                        ? 'bg-green-100 text-green-800 border border-green-200'
-                        : 'bg-gray-100 text-gray-600 border border-gray-200'
+                      ? 'bg-green-100 text-green-800 border border-green-200'
+                      : 'bg-gray-100 text-gray-600 border border-gray-200'
                       }`}>
                       {automation.status}
                     </span>
@@ -225,8 +225,8 @@ export default function AutomatePage() {
                   <button
                     onClick={(e) => toggleStatus(e, automation)}
                     className={`p-1.5 rounded-lg transition-colors ${automation.status === 'active'
-                        ? 'text-teal-600 hover:bg-teal-50'
-                        : 'text-gray-400 hover:bg-gray-50'
+                      ? 'text-teal-600 hover:bg-teal-50'
+                      : 'text-gray-400 hover:bg-gray-50'
                       }`}
                     title={automation.status === 'active' ? 'Deactivate schedule' : 'Activate schedule'}
                   >

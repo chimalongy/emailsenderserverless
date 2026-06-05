@@ -6,9 +6,9 @@ let supabaseInstance = null
 const getSupabase = () => {
   if (supabaseInstance) return supabaseInstance
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Supabase URL or ANON KEY not defined')
+    throw new Error('Supabase URL or ANON KEY/SERVICE ROLE KEY not defined')
   }
   supabaseInstance = createClient(supabaseUrl, supabaseAnonKey)
   return supabaseInstance
