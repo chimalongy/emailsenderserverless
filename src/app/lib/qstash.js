@@ -120,6 +120,54 @@ export const scheduleEmail = async (emailId, taskId, scheduledTime, userId) => {
   }
 }
 
+
+export const scheduleTaskSending = async (taskId, scheduledTime, userId) => {
+  const tokenSets = await getActiveQstashTokens(userId)
+  let tokenIndex = 0
+  let scheduled = false
+  let attempts = 0
+
+  while (!scheduled && attempts < tokenSets.length) {
+    const tokenSet = tokenSets[tokenIndex]
+
+    try {
+      const qstash = new Client({
+        token: tokenSet.token,
+        currentSigningKey: tokenSet.current_signing_key,
+        nextSigningKey: tokenSet.next_signing_key,
+      })
+
+      const baseUrl = getPublicBaseUrl()
+
+      const result = await qstash.publishJSON({
+        url: `${baseUrl}/api/start-email-sending`,
+        body: { task_id: taskId },
+        notBefore: Math.floor(scheduledTime / 1000),
+        retries: 3,
+      })
+
+      console.log(
+        `✅ Scheduled task sending ${taskId} for ${new Date(scheduledTime).toISOString()} via ${baseUrl} using token ID ${tokenSet.id}`
+      )
+      scheduled = true
+      return result
+    } catch (err) {
+      if (err.message.includes('QstashDailyRatelimitError')) {
+        console.warn(`Rate limit hit for token ID ${tokenSet.id}, trying next token`)
+        tokenIndex = (tokenIndex + 1) % tokenSets.length
+        attempts++
+      } else {
+        throw err
+      }
+    }
+  }
+
+  if (!scheduled) {
+    throw new Error(`Could not schedule task ${taskId}: All tokens exceeded daily rate limit`)
+  }
+}
+
 export default {
   scheduleEmail,
+  scheduleTaskSending,
 }

@@ -1,6 +1,6 @@
 import { schedules, logger } from "@trigger.dev/sdk/v3";
 import { createClient } from "@supabase/supabase-js";
-import { scheduleEmail } from "../app/lib/qstash.js";
+import { scheduleTaskSending } from "../app/lib/qstash.js";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -61,45 +61,53 @@ export const autoEmailSchedulerTask = schedules.task({
           continue;
         }
 
-        logger.info(`🚀 Scheduling ${pendingEmails.length} emails for task "${task.name}"...`);
+        logger.info(`🚀 Scheduling task sending for task "${task.name}" with ${pendingEmails.length} emails...`);
 
         // If the scheduled time is in the past, schedule starting from now
         const now = Date.now();
         const baseTime = Math.max(new Date(task.scheduled_at).getTime(), now);
         const sendRate = task.send_rate || 5;
 
+        // Update all pending emails in queue to 'scheduled' status
         for (let i = 0; i < pendingEmails.length; i++) {
           const email = pendingEmails[i];
           const delay = i * sendRate * 1000;
-          const scheduledTime = baseTime + delay;
+          const emailScheduledTime = baseTime + delay;
 
-          try {
-            // Schedule with QStash
-            await scheduleEmail(email.id, task.id, scheduledTime, task.user_id);
+          await supabase
+            .from("email_queue")
+            .update({
+              scheduled_at: new Date(emailScheduledTime).toISOString(),
+              status: "scheduled"
+            })
+            .eq("id", email.id);
+        }
 
-            // Update queue entry status to scheduled
-            await supabase
-              .from("email_queue")
-              .update({
-                scheduled_at: new Date(scheduledTime).toISOString(),
-                status: "scheduled"
-              })
-              .eq("id", email.id);
-          } catch (schedErr) {
-            logger.error(`❌ Failed to schedule email ${email.id} for task ${task.id}:`, schedErr);
-            await supabase
-              .from("email_queue")
-              .update({
-                status: "failed",
-                error_message: schedErr.message || "Failed to schedule with QStash"
-              })
-              .eq("id", email.id);
-          }
+        try {
+          // Schedule the single orchestrator task sending with QStash
+          await scheduleTaskSending(task.id, baseTime, task.user_id);
+        } catch (schedErr) {
+          logger.error(`❌ Failed to schedule task sending for task ${task.id}:`, schedErr);
+          
+          // Revert status of the emails to failed
+          await supabase
+            .from("email_queue")
+            .update({
+              status: "failed",
+              error_message: schedErr.message || "Failed to schedule with QStash"
+            })
+            .eq("task_id", task.id)
+            .eq("status", "scheduled");
+
+          await supabase
+            .from("tasks")
+            .update({ status: "failed" })
+            .eq("id", task.id);
         }
       }
 
       logger.info("🎉 Auto Email Scheduler run completed successfully!");
-      return { success: true, message: `Scheduled emails for ${tasksToSchedule.length} tasks.` };
+      return { success: true, message: `Scheduled ${tasksToSchedule.length} tasks.` };
 
     } catch (err) {
       logger.error("💥 Unexpected error in autoEmailSchedulerTask:", err);

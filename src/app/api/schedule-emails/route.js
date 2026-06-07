@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { scheduleEmail } from '../../lib/qstash'
+import { scheduleTaskSending } from '../../lib/qstash'
 
 export async function POST(request) {
   try {
@@ -149,58 +149,48 @@ export async function POST(request) {
       )
     }
 
-    let successfulSchedules = 0
     const errors = []
 
-    // Schedule each email with QStash
+    // Update all pending emails in queue to 'scheduled' status and set their predicted scheduled_at
     for (let i = 0; i < pendingEmails.length; i++) {
-      try {
-        const email = pendingEmails[i]
-        const delay = i * send_rate * 1000 // Convert to milliseconds
-        const scheduledTime = baseTime + delay
+      const email = pendingEmails[i]
+      const delay = i * send_rate * 1000
+      const emailScheduledTime = baseTime + delay
 
-        // Only schedule if in the future
-        if (scheduledTime > now) {
-          // Schedule with QStash
-          await scheduleEmail(email.id, task_id, scheduledTime,user.id)
+      await supabase
+        .from('email_queue')
+        .update({
+          scheduled_at: new Date(emailScheduledTime).toISOString(),
+          status: 'scheduled'
+        })
+        .eq('id', email.id)
+    }
 
-          // Update email queue with scheduled time
-          const { error: updateError } = await supabase
-            .from('email_queue')
-            .update({
-              scheduled_at: new Date(scheduledTime).toISOString(),
-              status: 'scheduled'
-            })
-            .eq('id', email.id)
-
-          if (updateError) {
-            errors.push(`Failed to update email ${email.id}: ${updateError.message}`)
-          } else {
-            successfulSchedules++
-          }
-        } else {
-          // If in past, mark as failed
-          await supabase
-            .from('email_queue')
-            .update({
-              status: 'failed',
-              error_message: 'Scheduled time in the past'
-            })
-            .eq('id', email.id)
-          
-          errors.push(`Email ${email.id}: Scheduled time in the past`)
-        }
-      } catch (emailError) {
-        console.error(`Failed to schedule email ${pendingEmails[i].id}:`, emailError)
-        errors.push(`Email ${pendingEmails[i].id}: ${emailError.message}`)
-      }
+    let successful = false
+    try {
+      // Schedule the single task trigger with QStash
+      await scheduleTaskSending(task_id, baseTime, user.id)
+      successful = true
+    } catch (schedErr) {
+      console.error(`Failed to schedule task sending for task ${task_id}:`, schedErr)
+      errors.push(`QStash scheduling failed: ${schedErr.message}`)
+      
+      // Revert status of emails to failed
+      await supabase
+        .from('email_queue')
+        .update({
+          status: 'failed',
+          error_message: schedErr.message || 'Failed to schedule with QStash'
+        })
+        .eq('task_id', task_id)
+        .eq('status', 'scheduled')
     }
 
     // Update task status
     const { error: taskError } = await supabase
       .from('tasks')
       .update({ 
-        status: successfulSchedules > 0 ? 'scheduled' : 'failed'
+        status: successful ? 'scheduled' : 'failed'
       })
       .eq('id', task_id)
 
@@ -210,10 +200,10 @@ export async function POST(request) {
     }
 
     const response = {
-      success: successfulSchedules > 0,
-      message: `Scheduled ${successfulSchedules} of ${pendingEmails.length} emails`,
+      success: successful,
+      message: successful ? `Scheduled task sending for task ${task_id}` : `Failed to schedule task: ${errors.join(', ')}`,
       total_emails: pendingEmails.length,
-      scheduled: successfulSchedules,
+      scheduled: successful ? pendingEmails.length : 0,
       errors: errors.length > 0 ? errors : undefined
     }
 

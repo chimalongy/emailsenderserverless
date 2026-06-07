@@ -28,10 +28,12 @@ import {
   FiCalendar,
   FiPackage,
   FiMenu,
-  FiChevronDown
+  FiChevronDown,
+  FiZap
 } from 'react-icons/fi'
 import { HiOutlineChartBar, HiOutlineChip, HiOutlineLightningBolt } from 'react-icons/hi'
 import { TbMail, TbMailOpened } from 'react-icons/tb'
+import { allocateEmails } from '../lib/allocation'
 
 // Custom components
 const StepIndicator = ({ step, totalSteps, title, description, icon: Icon, currentStep }) => (
@@ -204,6 +206,11 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
   const [showInstructions, setShowInstructions] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
   const [showMobileStepper, setShowMobileStepper] = useState(false)
+  const [scrapings, setScrapings] = useState([])
+  const [selectedScrapingId, setSelectedScrapingId] = useState('')
+  const [loadingScrapings, setLoadingScrapings] = useState(false)
+  const [userCursor, setUserCursor] = useState({ last_allocated_email: '', last_allocated_email_remainder: 0 })
+  const [nextUserCursor, setNextUserCursor] = useState(null)
 
   // Check mobile viewport
   useEffect(() => {
@@ -216,13 +223,92 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  // Fetch email accounts when modal opens
+  // Fetch email accounts and scrapings when modal opens
   useEffect(() => {
     if (isOpen && user) {
       fetchEmailAccounts()
+      fetchScrapings()
+      fetchUserCursor()
       setShowInstructions(true)
     }
   }, [isOpen, user])
+
+  const fetchScrapings = async () => {
+    setLoadingScrapings(true)
+    try {
+      const { data, error } = await supabase
+        .from('scrappings')
+        .select('id, name, emails')
+        .eq('user_id', user.id)
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setScrapings(data || [])
+    } catch (error) {
+      console.error('Error fetching scrapings:', error)
+    } finally {
+      setLoadingScrapings(false)
+    }
+  }
+
+  const fetchUserCursor = async () => {
+    if (!user) return
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('last_allocated_email, last_allocated_email_remainder')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      if (error) throw error
+      if (data) {
+        setUserCursor({
+          last_allocated_email: data.last_allocated_email || '',
+          last_allocated_email_remainder: data.last_allocated_email_remainder !== null && data.last_allocated_email_remainder !== undefined
+            ? parseInt(data.last_allocated_email_remainder)
+            : 0
+        })
+      }
+    } catch (error) {
+      console.error('Error fetching user cursor:', error)
+    }
+  }
+
+  const handleScrapingChange = (scrapingId) => {
+    setSelectedScrapingId(scrapingId)
+    if (!scrapingId) {
+      setFormData(prev => ({ ...prev, emailList: '' }))
+      return
+    }
+
+    const selectedScraping = scrapings.find(s => s.id === scrapingId)
+    if (selectedScraping && selectedScraping.emails) {
+      const uniqueEmails = new Set()
+      const emailsArray = Array.isArray(selectedScraping.emails)
+        ? selectedScraping.emails
+        : []
+
+      emailsArray.forEach(item => {
+        if (item && item.emails && Array.isArray(item.emails)) {
+          item.emails.forEach(email => {
+            if (email) {
+              uniqueEmails.add(email.trim().toLowerCase())
+            }
+          });
+        }
+      })
+
+      const emailsString = Array.from(uniqueEmails).join('\n')
+      
+      setFormData(prev => ({
+        ...prev,
+        emailList: emailsString
+      }))
+      
+      setValidationError('')
+    }
+  }
 
   const fetchEmailAccounts = async () => {
     try {
@@ -304,6 +390,7 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
     }))
 
     setFormData(prev => ({ ...prev, allocations: initialAllocations }))
+    setNextUserCursor(null)
     return true
   }
 
@@ -330,11 +417,12 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
       ...prev,
       allocations: prev.allocations.map(allocation => 
         allocation.account_id === accountId 
-          ? { ...allocation, allocated_emails: finalAllocation }
+          ? { ...allocation, allocated_emails: finalAllocation, allocated_list: undefined }
           : allocation
       )
     }))
     setValidationError('')
+    setNextUserCursor(null)
   }
 
   const handleBulkAllocation = () => {
@@ -472,6 +560,50 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
     setValidationError('')
   }
 
+  const handleAutoAllocate = () => {
+    const prospects = formData.emailList.split('\n')
+      .map(email => email.trim())
+      .filter(email => email.length > 0)
+
+    if (prospects.length === 0) {
+      setValidationError('Please enter at least one email address in Step 1')
+      return
+    }
+
+    if (emailAccounts.length === 0) {
+      setValidationError('No active email accounts available')
+      return
+    }
+
+    const result = allocateEmails(
+      prospects,
+      emailAccounts,
+      userCursor.last_allocated_email,
+      userCursor.last_allocated_email_remainder
+    )
+
+    const updatedAllocations = formData.allocations.map(acc => {
+      const allocationResult = result.allocations.find(a => a.account_id === acc.account_id)
+      return {
+        ...acc,
+        allocated_emails: allocationResult ? allocationResult.allocated_emails : 0,
+        allocated_list: allocationResult ? allocationResult.allocated_list : []
+      }
+    })
+
+    setFormData(prev => ({
+      ...prev,
+      allocations: updatedAllocations
+    }))
+
+    setNextUserCursor({
+      last_allocated_email: result.last_allocated_email,
+      last_allocated_email_remainder: result.last_allocated_email_remainder
+    })
+
+    setValidationError('')
+  }
+
   const filteredAccounts = formData.allocations.filter(account =>
     account.sender_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     account.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -541,6 +673,27 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
   const handleSaveOutbound = async () => {
     setLoading(true)
     try {
+      const rawEmails = formData.emailList.split('\n')
+        .map(email => email.trim())
+        .filter(email => email.length > 0)
+
+      let emailIndex = 0
+      const updatedAllocations = formData.allocations.map(allocation => {
+        if (allocation.allocated_list && allocation.allocated_list.length === allocation.allocated_emails) {
+          return allocation
+        }
+        const allocated = allocation.allocated_emails || 0
+        const list = []
+        for (let i = 0; i < allocated && emailIndex < rawEmails.length; i++) {
+          list.push(rawEmails[emailIndex])
+          emailIndex++
+        }
+        return {
+          ...allocation,
+          allocated_list: list
+        }
+      })
+
       const { error: outboundError } = await supabase
         .from('outbounds')
         .insert({
@@ -548,10 +701,26 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
           name: formData.name,
           status: 'draft',
           email_list: formData.emailList,
-          allocations: formData.allocations,
+          allocations: updatedAllocations.filter(a => a.allocated_emails > 0),
         })
 
       if (outboundError) throw outboundError
+
+      if (nextUserCursor) {
+        const { error: userUpdateError } = await supabase
+          .from('users')
+          .update({
+            last_allocated_email: nextUserCursor.last_allocated_email,
+            last_allocated_email_remainder: nextUserCursor.last_allocated_email_remainder
+          })
+          .eq('id', user.id)
+
+        if (userUpdateError) {
+          console.error('Error updating user cursor:', userUpdateError)
+        } else {
+          setUserCursor(nextUserCursor)
+        }
+      }
 
       onSuccess()
     } catch (error) {
@@ -572,6 +741,8 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
     setValidationError('')
     setBulkAllocation('')
     setSearchTerm('')
+    setSelectedScrapingId('')
+    setNextUserCursor(null)
   }
 
   const handleClose = () => {
@@ -737,6 +908,37 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                     </div>
 
                     <div>
+                      <label className="block text-sm font-semibold text-gray-900 mb-1.5 md:mb-2">
+                        Populate from Scraping (Optional)
+                      </label>
+                      <select
+                        className="w-full px-3 md:px-4 py-2.5 md:py-3 text-sm border border-gray-300 rounded-lg md:rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
+                        value={selectedScrapingId}
+                        onChange={(e) => handleScrapingChange(e.target.value)}
+                        disabled={loadingScrapings}
+                      >
+                        <option value="">-- Select a scraping to populate emails --</option>
+                        {scrapings.map(s => {
+                          let emailCount = 0
+                          if (Array.isArray(s.emails)) {
+                            const set = new Set()
+                            s.emails.forEach(item => {
+                              if (item && item.emails && Array.isArray(item.emails)) {
+                                item.emails.forEach(e => set.add(e.trim().toLowerCase()))
+                              }
+                            })
+                            emailCount = set.size
+                          }
+                          return (
+                            <option key={s.id} value={s.id}>
+                              {s.name} ({emailCount} unique emails)
+                            </option>
+                          )
+                        })}
+                      </select>
+                    </div>
+
+                    <div>
                       <div className="flex items-center justify-between mb-1.5 md:mb-2">
                         <label className="block text-sm font-semibold text-gray-900">
                           <FiMail className="inline mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4 text-gray-600" />
@@ -753,7 +955,10 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                           className="w-full px-3 md:px-4 py-2.5 md:py-3 border-0 focus:outline-none font-mono text-xs md:text-sm resize-none min-h-[150px] md:min-h-[200px]"
                           placeholder="john@example.com&#10;jane@company.com&#10;mark@gmail.com"
                           value={formData.emailList}
-                          onChange={(e) => setFormData({ ...formData, emailList: e.target.value })}
+                          onChange={(e) => {
+                            setFormData({ ...formData, emailList: e.target.value })
+                            setSelectedScrapingId('')
+                          }}
                         />
                         <div className="px-3 md:px-4 py-1.5 md:py-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-500">
                           Enter one email address per line
@@ -911,6 +1116,14 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
                         Quick Allocation Strategies
                       </label>
                       <div className="flex flex-wrap gap-1.5 md:gap-2">
+                        <button
+                          type="button"
+                          onClick={handleAutoAllocate}
+                          className="flex-1 min-w-[calc(50%-0.375rem)] sm:flex-none px-3 md:px-4 py-2 bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 text-xs md:text-sm font-bold rounded-lg transition-colors flex items-center justify-center shadow-sm"
+                        >
+                          <FiZap className="mr-1.5 h-3 w-3 md:h-4 md:w-4 text-teal-600 animate-pulse" />
+                          Auto Allocate
+                        </button>
                         <button
                           type="button"
                           onClick={() => applyQuickAllocation('equal')}

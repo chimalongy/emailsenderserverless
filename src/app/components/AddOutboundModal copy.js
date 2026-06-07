@@ -381,6 +381,24 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
      */
     setLoading(true)
     try {
+      const rawEmails = formData.emailList.split('\n')
+        .map(email => email.trim())
+        .filter(email => email.length > 0)
+
+      let emailIndex = 0
+      const updatedAllocations = formData.allocations.map(allocation => {
+        const allocated = allocation.allocated_emails || 0
+        const list = []
+        for (let i = 0; i < allocated && emailIndex < rawEmails.length; i++) {
+          list.push(rawEmails[emailIndex])
+          emailIndex++
+        }
+        return {
+          ...allocation,
+          allocated_list: list
+        }
+      })
+
       const { error: outboundError } = await supabase
         .from('outbounds')
         .insert({
@@ -388,7 +406,7 @@ export default function AddOutboundModal({ isOpen, onClose, onSuccess }) {
           name: formData.name,
           status: 'draft',
           email_list: formData.emailList,
-          allocations: formData.allocations,
+          allocations: updatedAllocations,
         })
 
       if (outboundError) throw outboundError

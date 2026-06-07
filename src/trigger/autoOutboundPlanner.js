@@ -1,6 +1,7 @@
 import { task, logger } from "@trigger.dev/sdk/v3";
 import { createClient } from "@supabase/supabase-js";
 import { llmPlanAutoOutbound } from "../app/lib/LLMCenter/LLM-central.js";
+import { allocateEmails } from "../app/lib/allocation.js";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -112,7 +113,19 @@ export const autoOutboundPlannerTask = task({
         return { success: false, error: "Failed to fetch existing tasks" };
       }
 
-      // 5. Trigger LLM Planner
+      // 5. Allocate emails programmatically
+      const programmaticAllocation = allocateEmails(
+        prospectsToAllocate,
+        emailAccounts,
+        userData.last_allocated_email || "",
+        userData.last_allocated_email_remainder !== null && userData.last_allocated_email_remainder !== undefined
+          ? parseInt(userData.last_allocated_email_remainder)
+          : 0
+      );
+
+      logger.info(`📊 Programmatic email allocation layout calculated: ${JSON.stringify(programmaticAllocation)}`);
+
+      // 6. Trigger LLM Planner for sequence copywriting and task scheduling
       logger.info("🤖 Calling LLM Planner to schedule tasks and rewrite email sequences...");
       const result = await llmPlanAutoOutbound({
         domain: autoOutbound.domain,
@@ -132,12 +145,17 @@ export const autoOutboundPlannerTask = task({
         price: autoOutbound.price || undefined
       });
 
-      if (!result || !result.allocations || !result.tasks) {
+      if (!result || !result.tasks) {
         logger.error("❌ Invalid response from LLM planner:", result);
         return { success: false, error: "Invalid LLM planner response" };
       }
 
-      logger.info("✅ LLM Planner returned layout:", JSON.stringify(result));
+      // Override LLM allocation layout with deterministic programmatic results
+      result.allocations = programmaticAllocation.allocations;
+      result.last_allocated_email = programmaticAllocation.last_allocated_email;
+      result.last_allocated_email_remainder = programmaticAllocation.last_allocated_email_remainder;
+
+      logger.info("✅ LLM Planner returned layout, combined with programmatic allocation:", JSON.stringify(result));
 
       // 6. Update allocations in auto_outbounds
       const { error: outboundUpdateError } = await supabase
