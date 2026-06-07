@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   FaRobot, FaPlay, FaPlus, FaClock, FaCheckCircle,
   FaCogs, FaExclamationTriangle, FaToggleOn, FaToggleOff,
-  FaEnvelope, FaBullseye, FaSpinner
+  FaEnvelope, FaBullseye, FaSpinner, FaTrash
 } from 'react-icons/fa';
 import { FiChevronRight } from 'react-icons/fi';
 import { toast, Toaster } from 'react-hot-toast';
@@ -90,6 +90,79 @@ export default function AutomatePage() {
         loading: `Running "${name}" outbound agent...`,
         success: `AI outbound sequence triggered for "${name}".`,
         error: 'Execution failed.',
+      }
+    );
+  };
+
+  const handleDelete = async (e, automation) => {
+    e.stopPropagation();
+    
+    const confirmed = window.confirm(
+      `Are you sure you want to delete the automation "${automation.name}"?\n\nThis will permanently delete this automation, its linked outbound campaigns, all scheduled sequence tasks, and queued emails.`
+    );
+    
+    if (!confirmed) return;
+
+    const deletePromise = async () => {
+      // 1. Fetch linked outbounds by name & user_id
+      const { data: linkedOutbounds, error: outboundsError } = await supabase
+        .from('outbounds')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('name', automation.name);
+
+      if (outboundsError) throw outboundsError;
+
+      if (linkedOutbounds && linkedOutbounds.length > 0) {
+        const outboundIds = linkedOutbounds.map(o => o.id);
+
+        // 2. Delete enqueued emails for these outbounds
+        const { error: queueDeleteError } = await supabase
+          .from('email_queue')
+          .delete()
+          .eq('user_id', user.id)
+          .in('outbound_id', outboundIds);
+
+        if (queueDeleteError) throw queueDeleteError;
+
+        // 3. Delete tasks for these outbounds
+        const { error: tasksDeleteError } = await supabase
+          .from('tasks')
+          .delete()
+          .eq('user_id', user.id)
+          .in('outbound_id', outboundIds);
+
+        if (tasksDeleteError) throw tasksDeleteError;
+
+        // 4. Delete the outbounds themselves
+        const { error: campaignDeleteError } = await supabase
+          .from('outbounds')
+          .delete()
+          .eq('user_id', user.id)
+          .in('id', outboundIds);
+
+        if (campaignDeleteError) throw campaignDeleteError;
+      }
+
+      // 5. Finally, delete the auto_outbounds automation record
+      const { error: autoOutboundDeleteError } = await supabase
+        .from('auto_outbounds')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('id', automation.id);
+
+      if (autoOutboundDeleteError) throw autoOutboundDeleteError;
+
+      // Update local state to remove the deleted automation
+      setAutomations((prev) => prev.filter((a) => a.id !== automation.id));
+    };
+
+    toast.promise(
+      deletePromise(),
+      {
+        loading: `Deleting "${automation.name}" automation and cleaning up related campaigns...`,
+        success: `Successfully deleted automation "${automation.name}" and all associated data.`,
+        error: `Failed to delete automation: some records could not be removed.`,
       }
     );
   };
@@ -235,6 +308,13 @@ export default function AutomatePage() {
                     ) : (
                       <FaToggleOff className="w-8 h-8" />
                     )}
+                  </button>
+                  <button
+                    onClick={(e) => handleDelete(e, automation)}
+                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Delete automation"
+                  >
+                    <FaTrash className="w-4 h-4" />
                   </button>
                   <FiChevronRight className="w-4 h-4 text-gray-300 group-hover:text-teal-500 transition-colors" />
                 </div>
