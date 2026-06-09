@@ -128,7 +128,7 @@ export async function POST(request) {
         .from('scrappings')
         .insert({
           user_id: user.id,
-          method: 'manual',
+          method: 'urls',
           name: `Auto Outbound Scrape - ${name.trim()}`,
           status: 'completed',
           emails: [{ link_scraped: 'manual_pasted', emails: parsedEmails }],
