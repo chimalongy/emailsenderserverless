@@ -32,11 +32,7 @@ Always respond with valid JSON in exactly this shape — no markdown, no extra t
 
 export function buildAutoOutboundPlannerPrompt({
   domain,
-  endUsersList,
-  sendingGmailAccounts,
   existingTasks,
-  lastAllocatedEmail,
-  lastAllocatedEmailRemainder = 0,
   startDate,
   price = "$1,995"
 }) {
@@ -54,14 +50,8 @@ TYPES OF DOMAINS THAT CAN BE OUTBOUNDED ARE:
 HOW OUTBOUNDING IS CARRIED OUT:
 1. First the domain is purchased and the nameservers are pointed to GoDaddy's Afternic.
 2. Target businesses are identified using keywords + locations, and their website URLs are collected.
-3. Prospects' emails are scraped from the website URLs. This list of prospective buyers is provided to you as END_USERS_LIST.
-4. You are provided with multiple Gmail sending accounts as SENDING_GMAIL_ACCOUNTS. Each has a daily limit, daily sent count today, and app password.
-5. You are to allocate prospects from END_USERS_LIST to SENDING_GMAIL_ACCOUNTS sequentially.
-   - If a previous run left a remainder (LAST_ALLOCATED_EMAIL_REMAINDER > 0) on the last used sending account (LAST_ALLOCATED_EMAIL), you should first allocate prospects to that account up to its remaining capacity.
-   - Otherwise, or once that remainder is satisfied, proceed to allocate prospects to the next active SENDING_GMAIL_ACCOUNTS sequentially.
-   - Daily Capacity per account = daily_limit - sent_today. Never exceed the capacity of any account.
-6. The database stores the last used sending account email in public.users.last_allocated_email, and its remaining capacity (daily capacity minus allocated count in this run) in public.users.last_allocated_email_remainder.
-7. The sendingrate must be a number between 16 and 25.
+3. Prospects' emails are scraped from the website URLs.
+4. The sendingrate must be a number between 16 and 25.
 
 EMAIL SCHEDULING (TASKS):
 You must plan exactly 4 tasks (Task 1, Task 2, Task 3, Task 4) representing a campaign sequence:
@@ -70,7 +60,7 @@ You must plan exactly 4 tasks (Task 1, Task 2, Task 3, Task 4) representing a ca
 - Task 3 (type: "followup"): Scheduled for Day Five (Day One + 4 days).
 - Task 4 (type: "followup"): Scheduled for Day Six (Day One + 5 days).
 
-Always schedule the tasks for 09:00:00 UTC/Z (e.g. 2026-06-04T09:00:00.000Z).
+Always schedule the tasks using the provided start_date. Use the exact time portion from start_date for Task 1, and increment the date for follow-ups (Day One + 1 day, Day One + 4 days, Day One + 5 days), keeping the time portion exactly the same.
 Make sure to check EXISTING_TASKS to avoid scheduling any tasks on days when the assigned email accounts are already busy. If there is a scheduling conflict, shift the task schedule forward to the next nearest day when all assigned email accounts are free, preserving the relative day spacing between tasks (1 day between Task 1 & Task 2, 3 days between Task 2 & Task 3, 1 day between Task 3 & Task 4).
 
 EMAIL REWRITING:
@@ -94,12 +84,6 @@ Always respond with a single valid JSON object. Do not wrap the JSON in markdown
 
 Expected JSON Structure:
 {
-  "allocations": [
-    {
-      "account_id": "account-uuid",
-      "allocated_emails": 15
-    }
-  ],
   "tasks": [
     {
       "name": "Task 1",
@@ -133,9 +117,7 @@ Expected JSON Structure:
       "scheduled_at": "ISO-8601-datetime-string-UTC",
       "send_rate": 5
     }
-  ],
-  "last_allocated_email": "last_sender_email@gmail.com",
-  "last_allocated_email_remainder": 25
+  ]
 }
   `.trim();
 
@@ -145,14 +127,6 @@ Analyze the target domain and plan the outbound campaign. Here is the input data
 Domain: ${domain}
 Start Date: ${startDate}
 Offer Price: ${price}
-Last Used Sending Email (Previous): ${lastAllocatedEmail}
-Remaining Capacity of Last Used Sender: ${lastAllocatedEmailRemainder}
-
-END_USERS_LIST (Scraped prospective buyer emails):
-${JSON.stringify(endUsersList, null, 2)}
-
-SENDING_GMAIL_ACCOUNTS:
-${JSON.stringify(sendingGmailAccounts, null, 2)}
 
 EXISTING_TASKS (Previously scheduled tasks to avoid conflicts):
 ${JSON.stringify(existingTasks, null, 2)}

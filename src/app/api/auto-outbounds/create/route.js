@@ -46,7 +46,7 @@ export async function POST(request) {
 
     // ── 2. Parse body ─────────────────────────────────────────────────────────
     const body = await request.json();
-    const { name, domain, startDate, price } = body;
+    const { name, domain, startDate, price, emailList } = body;
 
     if (!name?.trim()) {
       return NextResponse.json(
@@ -101,18 +101,72 @@ export async function POST(request) {
     }
 
     // ── 4. Insert ─────────────────────────────────────────────────────────────
+    let scrapeId = null;
+    let parsedEmails = [];
+
+    if (emailList && emailList.trim()) {
+      parsedEmails = emailList
+        .split('\n')
+        .map(email => email.trim())
+        .filter(email => email.length > 0);
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const invalidEmails = parsedEmails.filter(email => !emailRegex.test(email));
+      if (invalidEmails.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'invalid_emails',
+            message: `Invalid email addresses: ${invalidEmails.slice(0, 3).join(', ')}${invalidEmails.length > 3 ? '...' : ''}`
+          },
+          { status: 400 }
+        );
+      }
+
+      // Create a completed scrape record immediately for the pasted emails
+      const { data: scrapeData, error: scrapeError } = await supabaseAdmin
+        .from('scrappings')
+        .insert({
+          user_id: user.id,
+          method: 'manual',
+          name: `Auto Outbound Scrape - ${name.trim()}`,
+          status: 'completed',
+          emails: [{ link_scraped: 'manual_pasted', emails: parsedEmails }],
+          emails_found: parsedEmails.length,
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (scrapeError) {
+        console.error('Error creating scrape record:', scrapeError);
+        return NextResponse.json(
+          { success: false, error: 'Failed to create scrape record for provided email list.' },
+          { status: 500 }
+        );
+      }
+      scrapeId = scrapeData.id;
+    }
+
+    const insertPayload = {
+      user_id: user.id,
+      name: name.trim(),
+      domain: domain.trim(),
+      start_date: startDate,
+      status: 'active',
+      emails_sent: 0,
+      campaigns_completed: 0,
+      price: price.trim(),
+    };
+
+    if (scrapeId) {
+      insertPayload.scrape_id = scrapeId;
+    }
+
     const { data: created, error: insertError } = await supabaseAdmin
       .from('auto_outbounds')
-      .insert({
-        user_id: user.id,
-        name: name.trim(),
-        domain: domain.trim(),
-        start_date: startDate,
-        status: 'active',
-        emails_sent: 0,
-        campaigns_completed: 0,
-        price: price.trim(),
-      })
+      .insert(insertPayload)
       .select()
       .single();
 
@@ -124,17 +178,22 @@ export async function POST(request) {
       );
     }
 
-    // trigger a auto-outbound setup trigger. dev task here
-    const payload = {
-      autoOutboundId: created.id,
-      userId: user.id,
-      domain: domain.trim(),
-      name: name.trim(),
-      startDate
-    };
-    console.log(JSON.stringify(payload));
-
-    const handle = await tasks.trigger("auto-outbound-setup", payload);
+    let handle;
+    if (scrapeId) {
+      // Bypassing scraping, route directly to allocation & planning
+      handle = await tasks.trigger("auto-outbound-planner", { autoOutbound: created });
+    } else {
+      // Normal scraping/setup flow
+      const payload = {
+        autoOutboundId: created.id,
+        userId: user.id,
+        domain: domain.trim(),
+        name: name.trim(),
+        startDate
+      };
+      console.log(JSON.stringify(payload));
+      handle = await tasks.trigger("auto-outbound-setup", payload);
+    }
 
 
     return NextResponse.json({ success: true, data: created, triggerRunId: handle.id }, { status: 201 });

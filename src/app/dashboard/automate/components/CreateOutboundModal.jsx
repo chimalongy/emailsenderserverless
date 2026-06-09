@@ -16,8 +16,10 @@ export default function CreateOutboundModal({ isOpen, onClose, onCreate }) {
   // Form state
   const [selectedDomain, setSelectedDomain] = useState('');
   const [startDate, setStartDate] = useState('');
+  const [startTime, setStartTime] = useState('09:00');
   const [automationName, setAutomationName] = useState('');
   const [offerPrice, setOfferPrice] = useState('$1,995');
+  const [emailList, setEmailList] = useState('');
 
   // Data state
   const [domains, setDomains] = useState([]);
@@ -28,6 +30,7 @@ export default function CreateOutboundModal({ isOpen, onClose, onCreate }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [nameError, setNameError] = useState(null);
   const [submitError, setSubmitError] = useState(null);
+  const [emailListError, setEmailListError] = useState(null);
 
   // Fetch domains whenever modal opens
   useEffect(() => {
@@ -64,11 +67,14 @@ export default function CreateOutboundModal({ isOpen, onClose, onCreate }) {
     if (!isOpen) {
       setSelectedDomain('');
       setStartDate('');
+      setStartTime('09:00');
       setAutomationName('');
       setOfferPrice('$1,995');
+      setEmailList('');
       setDomainError(null);
       setNameError(null);
       setSubmitError(null);
+      setEmailListError(null);
     }
   }, [isOpen]);
 
@@ -76,6 +82,7 @@ export default function CreateOutboundModal({ isOpen, onClose, onCreate }) {
     e.preventDefault();
     setNameError(null);
     setSubmitError(null);
+    setEmailListError(null);
 
     if (!selectedDomain) {
       alert('Please select a domain.');
@@ -93,6 +100,25 @@ export default function CreateOutboundModal({ isOpen, onClose, onCreate }) {
     if (!offerPrice.trim()) {
       alert('Please enter an offer price.');
       return;
+    }
+
+    const localDatetime = `${startDate}T${startTime || '09:00'}`;
+    const utcStartDateTime = new Date(localDatetime).toISOString();
+
+    // Local email list validation if provided
+    let parsedEmails = [];
+    if (emailList.trim()) {
+      parsedEmails = emailList
+        .split('\n')
+        .map(email => email.trim())
+        .filter(email => email.length > 0);
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const invalidEmails = parsedEmails.filter(email => !emailRegex.test(email));
+      if (invalidEmails.length > 0) {
+        setEmailListError(`Invalid email addresses: ${invalidEmails.slice(0, 3).join(', ')}${invalidEmails.length > 3 ? '...' : ''}`);
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -113,8 +139,9 @@ export default function CreateOutboundModal({ isOpen, onClose, onCreate }) {
         body: JSON.stringify({
           name: automationName.trim(),
           domain: selectedDomain,
-          startDate,
+          startDate: utcStartDateTime,
           price: offerPrice.trim(),
+          emailList: emailList.trim(),
         }),
       });
 
@@ -277,24 +304,38 @@ export default function CreateOutboundModal({ isOpen, onClose, onCreate }) {
             )}
           </div>
 
-          {/* Start Date */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-              <FaCalendarAlt className="inline w-3.5 h-3.5 mr-1.5 text-teal-600" />
-              Start Date <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="date"
-              value={startDate}
-              min={today}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
-              required
-            />
-            <p className="text-xs text-gray-500 mt-1.5">
-              The automation will begin sending on this date.
-            </p>
+          {/* Start Date & Time */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                <FaCalendarAlt className="inline w-3.5 h-3.5 mr-1.5 text-teal-600" />
+                Start Date <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={startDate}
+                min={today}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                Start Time <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                required
+              />
+            </div>
           </div>
+          <p className="text-xs text-gray-500 mt-1.5">
+            The automation will begin sending on the selected date and time (in your local timezone).
+          </p>
 
           {/* Offer Price */}
           <div>
@@ -312,6 +353,37 @@ export default function CreateOutboundModal({ isOpen, onClose, onCreate }) {
             <p className="text-xs text-gray-500 mt-1.5">
               The price at which the domain will be offered.
             </p>
+          </div>
+
+          {/* Prospect Email List */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              Prospect Email List (Optional)
+            </label>
+            <textarea
+              rows={4}
+              value={emailList}
+              onChange={(e) => {
+                setEmailList(e.target.value);
+                if (emailListError) setEmailListError(null);
+              }}
+              placeholder="e.g.&#10;john@example.com&#10;jane@company.com"
+              className={`w-full px-4 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:border-transparent transition-all placeholder:text-gray-400 font-mono ${
+                emailListError
+                  ? 'border-red-400 focus:ring-red-400 bg-red-50'
+                  : 'border-gray-300 focus:ring-teal-500'
+              }`}
+            />
+            {emailListError ? (
+              <p className="mt-1.5 flex items-start gap-1.5 text-xs text-red-600">
+                <FaExclamationCircle className="flex-shrink-0 mt-0.5" />
+                {emailListError}
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500 mt-1.5">
+                Paste your email list (one per line). If provided, scraping will be bypassed and the campaign goes straight to planning.
+              </p>
+            )}
           </div>
 
           {/* General submit error */}

@@ -8,6 +8,30 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+function getSequenceDates(startDateStr, busyDates) {
+  let start = new Date(startDateStr);
+  
+  while (true) {
+    const d1 = new Date(start);
+    const d2 = new Date(start); d2.setDate(d2.getDate() + 1);
+    const d3 = new Date(start); d3.setDate(d3.getDate() + 4);
+    const d4 = new Date(start); d4.setDate(d4.getDate() + 5);
+
+    const format = (d) => d.toISOString().split('T')[0];
+
+    const hasConflict = busyDates.has(format(d1)) ||
+                        busyDates.has(format(d2)) ||
+                        busyDates.has(format(d3)) ||
+                        busyDates.has(format(d4));
+
+    if (!hasConflict) {
+      return [d1.toISOString(), d2.toISOString(), d3.toISOString(), d4.toISOString()];
+    }
+
+    start.setDate(start.getDate() + 1);
+  }
+}
+
 export const autoOutboundPlannerTask = task({
   id: "auto-outbound-planner",
   run: async (payload) => {
@@ -127,35 +151,27 @@ export const autoOutboundPlannerTask = task({
 
       // 6. Trigger LLM Planner for sequence copywriting and task scheduling
       logger.info("🤖 Calling LLM Planner to schedule tasks and rewrite email sequences...");
-      const result = await llmPlanAutoOutbound({
+      const llmResult = await llmPlanAutoOutbound({
         domain: autoOutbound.domain,
-        endUsersList: prospectsToAllocate,
-        sendingGmailAccounts: emailAccounts.map(acc => ({
-          id: acc.id,
-          email: acc.email,
-          sender_name: acc.sender_name,
-          daily_limit: acc.daily_limit,
-          sent_today: acc.sent_today,
-          last_sent: acc.last_sent
-        })),
         existingTasks: existingTasks || [],
-        lastAllocatedEmail: userData.last_allocated_email || "",
-        lastAllocatedEmailRemainder: parseInt(userData.last_allocated_email_remainder) || 0,
         startDate: autoOutbound.start_date,
         price: autoOutbound.price || undefined
       });
 
-      if (!result || !result.tasks) {
-        logger.error("❌ Invalid response from LLM planner:", result);
+      if (!llmResult || !llmResult.tasks) {
+        logger.error("❌ Invalid response from LLM planner:", llmResult);
         return { success: false, error: "Invalid LLM planner response" };
       }
 
-      // Override LLM allocation layout with deterministic programmatic results
-      result.allocations = programmaticAllocation.allocations;
-      result.last_allocated_email = programmaticAllocation.last_allocated_email;
-      result.last_allocated_email_remainder = programmaticAllocation.last_allocated_email_remainder;
+      // Merge LLM tasks with deterministic programmatic allocation results
+      const result = {
+        tasks: llmResult.tasks,
+        allocations: programmaticAllocation.allocations,
+        last_allocated_email: programmaticAllocation.last_allocated_email,
+        last_allocated_email_remainder: programmaticAllocation.last_allocated_email_remainder
+      };
 
-      logger.info("✅ LLM Planner returned layout, combined with programmatic allocation:", JSON.stringify(result));
+      logger.info("✅ LLM Planner returned sequence plan, combined with programmatic allocation:", JSON.stringify(result));
 
       // 6. Update allocations in auto_outbounds
       const { error: outboundUpdateError } = await supabase
@@ -213,12 +229,24 @@ export const autoOutboundPlannerTask = task({
       logger.info(`✅ Created campaign "${createdOutbound.name}" (ID: ${createdOutbound.id}) in outbounds table.`);
 
       // 10. Save Tasks to Database
-      const tasksToInsert = result.tasks.map(t => ({
+      // Calculate sequence dates deterministically based on user selected start_date & time
+      const busyDates = new Set(existingTasks ? existingTasks.map(t => t.scheduled_at.split('T')[0]) : []);
+      const sequenceDates = getSequenceDates(autoOutbound.start_date, busyDates);
+      logger.info(`📅 Calculated deterministic sequence dates: ${JSON.stringify(sequenceDates)}`);
+
+      // Sort tasks by name to guarantee sequence order: Task 1, Task 2, Task 3, Task 4
+      const sortedTasks = [...result.tasks].sort((a, b) => {
+        const numA = parseInt(a.name?.replace(/\D/g, '')) || 0;
+        const numB = parseInt(b.name?.replace(/\D/g, '')) || 0;
+        return numA - numB;
+      });
+
+      const tasksToInsert = sortedTasks.map((t, idx) => ({
         outbound_id: createdOutbound.id,
         name: t.name,
         type: t.type,
         body: t.body,
-        scheduled_at: t.scheduled_at,
+        scheduled_at: sequenceDates[idx] || t.scheduled_at,
         send_rate: t.send_rate || 5,
         status: "scheduled",
         user_id: autoOutbound.user_id,
