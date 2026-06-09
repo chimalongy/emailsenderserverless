@@ -14,7 +14,8 @@ export const autoEmailSchedulerTask = schedules.task({
     timezone: "UTC",
   },
   run: async (payload) => {
-    logger.info(`⏰ Starting Auto Email Scheduler at ${payload.timestamp.toISOString()}`);
+    const timestamp = payload?.timestamp ? new Date(payload.timestamp) : new Date();
+    logger.info(`⏰ Starting Auto Email Scheduler at ${timestamp.toISOString()}`);
 
     try {
       // Find all tasks that are scheduled and scheduled_at <= end of today

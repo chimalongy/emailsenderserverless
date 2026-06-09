@@ -1,4 +1,4 @@
-import { task, logger } from "@trigger.dev/sdk/v3";
+import { task, logger, tasks } from "@trigger.dev/sdk/v3";
 import { createClient } from "@supabase/supabase-js";
 import { llmPlanAutoOutbound } from "../app/lib/LLMCenter/LLM-central.js";
 import { allocateEmails } from "../app/lib/allocation.js";
@@ -298,6 +298,20 @@ export const autoOutboundPlannerTask = task({
       }
 
       logger.info(`✅ Created ${emailQueueEntries.length} email queue entries.`);
+
+      // If start_date is today, run autoEmailScheduler immediately
+      try {
+        const todayStr = new Date().toISOString().split("T")[0];
+        const startStr = new Date(autoOutbound.start_date).toISOString().split("T")[0];
+        if (todayStr === startStr) {
+          logger.info("📅 Campaign start date is today! Triggering auto-email-scheduler immediately...");
+          await tasks.trigger("auto-email-scheduler", { timestamp: new Date().toISOString() });
+        } else {
+          logger.info(`📅 Campaign start date is ${startStr} (today is ${todayStr}). Will be scheduled via daily cron.`);
+        }
+      } catch (scheduleErr) {
+        logger.error("💥 Failed to check/trigger auto-email-scheduler:", scheduleErr);
+      }
 
       logger.info("🎉 Auto outbound planning completed successfully!");
       return { success: true, message: "Campaign planned and tasks saved as scheduled successfully." };
