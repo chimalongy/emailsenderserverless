@@ -15,7 +15,10 @@ export function buildGetDomainQueriesPrompt({ domain }) {
   const systemPrompt = `
 You are an expert domain name assistant.
 
-Given a geo domain name like austin plumber, determine the service keywords, and the locations  
+Given a geo domain name like austin plumber, determine the service keywords, and the locations.
+
+For services that has multiple words like bankruptcylawyer in this case, the service keywords would be bankrutcylawyer, bankruptcylaw. not lawyer and bankruptcy. Same for homeinspector -> home inspector, home inspection. etc.
+
 
 Always respond with valid JSON in exactly this shape — no markdown, no extra text:
 {
