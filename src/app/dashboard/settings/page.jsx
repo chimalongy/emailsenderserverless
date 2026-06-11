@@ -2,13 +2,14 @@
 'use client';
 
 import { useState } from 'react';
-import { FiUser, FiShield, FiKey, FiBell, FiGlobe } from 'react-icons/fi';
+import { FiUser, FiShield, FiKey, FiBell, FiGlobe, FiFileText } from 'react-icons/fi';
 import { Toaster } from 'react-hot-toast';
 import ProfileTab from './components/ProfileTab';
 import AccountTab from './components/AccountTab';
 import SecurityTab from './components/SecurityTab';
 import QStashTab from './components/QStashTab';
 import ApifyApiTab from './components/ApifyApiTab';
+import SalesLetterTemplatesTab from './components/SalesLetterTemplatesTab';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile');
@@ -44,6 +45,12 @@ export default function SettingsPage() {
       icon: <FiKey className="w-4 h-4" />,
       description: 'Manage your Apify API keys'
     },
+    { 
+      id: 'templates', 
+      label: 'Sales Letter Templates', 
+      icon: <FiFileText className="w-4 h-4" />,
+      description: 'Manage campaign email templates'
+    },
   ];
 
   const renderTabContent = () => {
@@ -58,6 +65,8 @@ export default function SettingsPage() {
         return <QStashTab />;
       case 'apify_api':
         return <ApifyApiTab />;
+      case 'templates':
+        return <SalesLetterTemplatesTab />;
       default:
         return (
           <div className="text-center py-12">

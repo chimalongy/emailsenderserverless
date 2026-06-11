@@ -34,8 +34,33 @@ export function buildAutoOutboundPlannerPrompt({
   domain,
   existingTasks,
   startDate,
-  price = "$1,995"
+  price = "$1,995",
+  userSalesLetterTemplates = {}
 }) {
+  // Resolve templates for each task position.
+  // User-configured templates (from sales_letter_templates JSONB column) take priority;
+  // fall back to the built-in outboundLetters when no user templates are configured
+  // for that position.
+  const hasUserTemplates = userSalesLetterTemplates &&
+    typeof userSalesLetterTemplates === 'object' &&
+    Object.keys(userSalesLetterTemplates).length > 0;
+
+  const task1Templates = (hasUserTemplates && userSalesLetterTemplates.first_outbound_templates?.length)
+    ? userSalesLetterTemplates.first_outbound_templates
+    : first_outbound_email_templates;
+
+  const task2Templates = (hasUserTemplates && userSalesLetterTemplates.second_outbound_templates?.length)
+    ? userSalesLetterTemplates.second_outbound_templates
+    : second_outbound_email_templates;
+
+  const task3Templates = (hasUserTemplates && userSalesLetterTemplates.third_outbound_templates?.length)
+    ? userSalesLetterTemplates.third_outbound_templates
+    : third_outbound_email_templates;
+
+  const task4Templates = (hasUserTemplates && userSalesLetterTemplates.fourth_outbound_templates?.length)
+    ? userSalesLetterTemplates.fourth_outbound_templates
+    : fourth_outbound_email_templates;
+
   let systemPrompt = `
 You are an expert domain flipping outbound planner. Your goal is to plan outbound campaigns following the strategy provided below and return a JSON payload ready to be saved in the database.
 
@@ -65,10 +90,10 @@ Make sure to check EXISTING_TASKS to avoid scheduling any tasks on days when the
 
 EMAIL REWRITING:
 You must rewrite the email templates to fit the current target domain:
-- Task 1 uses a template from the first outbound templates: ${JSON.stringify(first_outbound_email_templates)}
-- Task 2 uses a template from the second outbound templates: ${JSON.stringify(second_outbound_email_templates)}
-- Task 3 uses a template from the third outbound templates: ${JSON.stringify(third_outbound_email_templates)}
-- Task 4 uses a template from the fourth outbound templates: ${JSON.stringify(fourth_outbound_email_templates)}
+ - Task 1 uses a template from the first outbound templates: ${JSON.stringify(task1Templates)}
+ - Task 2 uses a template from the second outbound templates: ${JSON.stringify(task2Templates)}
+ - Task 3 uses a template from the third outbound templates: ${JSON.stringify(task3Templates)}
+ - Task 4 uses a template from the fourth outbound templates: ${JSON.stringify(task4Templates)}
 
 Rules for rewriting:
 1. Re-phrase the templates to sound natural and match the target service category of the domain name (e.g., if the domain is sandiegoplumber.com, talk about a plumbing business in San Diego).

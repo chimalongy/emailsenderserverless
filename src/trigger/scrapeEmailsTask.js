@@ -2,6 +2,7 @@ import { logger, task, tasks } from "@trigger.dev/sdk/v3";
 import { createClient } from "@supabase/supabase-js";
 import fetch from "node-fetch";
 import * as cheerio from "cheerio";
+import { extractBusinessEmail } from "../app/lib/Firecrawl.js"; // adjust path as needed
 
 /* ----------------------------------
    Fetch with timeout
@@ -85,7 +86,7 @@ function extractRelevantLinks(html, baseUrl) {
       try {
         const absolute = new URL(href, baseUrl).toString();
         if (!links.includes(absolute)) links.push(absolute);
-      } catch { }
+      } catch {}
     }
   });
 
@@ -124,7 +125,7 @@ async function extractEmailsWithPuppeteer(url, timeoutMs = 25000) {
     if (browser) {
       try {
         await browser.close();
-      } catch { }
+      } catch {}
     }
   }
 }
@@ -135,7 +136,6 @@ async function extractEmailsWithPuppeteer(url, timeoutMs = 25000) {
 function applyEmailFilters(emails, filterItems, startsWithItems) {
   let processed = [...emails];
 
-  // Remove prefix if startsWithItems is defined
   if (startsWithItems.length) {
     processed = processed.map((email) => {
       for (const prefix of startsWithItems) {
@@ -147,7 +147,6 @@ function applyEmailFilters(emails, filterItems, startsWithItems) {
     });
   }
 
-  // Filter out unwanted items
   if (filterItems.length) {
     processed = processed.filter((email) => {
       const lower = email.toLowerCase();
@@ -157,12 +156,23 @@ function applyEmailFilters(emails, filterItems, startsWithItems) {
     });
   }
 
-  // Normalize: trim, lowercase, and deduplicate
   processed = Array.from(
     new Set(processed.map((email) => email.trim().toLowerCase()))
   );
 
   return processed;
+}
+
+/* ----------------------------------
+   Check if a website is live
+----------------------------------- */
+async function isWebsiteLive(url) {
+  try {
+    const res = await fetchWithTimeout(url, 10000);
+    return res.ok || res.status < 500; // 2xx, 3xx, 4xx = live, just restricted
+  } catch {
+    return false;
+  }
 }
 
 /* ----------------------------------
@@ -176,7 +186,9 @@ function parsePayload(payload) {
     typeof userId !== "string" ||
     !Array.isArray(urls)
   ) {
-    throw new Error("Invalid payload: scrappingId, userId must be strings and urls must be an array");
+    throw new Error(
+      "Invalid payload: scrappingId, userId must be strings and urls must be an array"
+    );
   }
 
   return { scrappingId, userId, urls };
@@ -196,15 +208,13 @@ export const scrapeEmailsTask = task({
       process.env.SUPABASE_SERVICE_ROLE_KEY
     );
 
-    // get the scrapping name
-
     const { data: scrapping } = await supabase
       .from("scrappings")
       .select("name")
       .eq("id", scrappingId)
       .single();
 
-      const scrappingName = scrapping?.name;
+    const scrappingName = scrapping?.name;
 
     const { data: filters } = await supabase
       .from("scrape_email_filters")
@@ -231,6 +241,8 @@ export const scrapeEmailsTask = task({
       const addEmail = (email) => {
         if (!emails.includes(email)) emails.push(email);
       };
+
+      let scrapeFailed = false;
 
       try {
         let homeHtml = "";
@@ -296,16 +308,44 @@ export const scrapeEmailsTask = task({
             continue;
           }
         }
-
-        const filtered = applyEmailFilters(emails, filterItems, startsWithItems);
-
-        results.push({
-          link_scraped: originalUrl,
-          emails: filtered,
-        });
       } catch {
-        results.push({ link_scraped: originalUrl, emails: [] });
+        // main scrape failed — mark it so we can try firecrawl below
+        scrapeFailed = true;
       }
+
+      /* --------------------------------------------------
+         FIRECRAWL FALLBACK
+         Only triggered when:
+         1. The normal scrape threw an error (scrapeFailed)
+         2. The website is actually live (not just down)
+      -------------------------------------------------- */
+      if (scrapeFailed && emails.length === 0) {
+        const live = await isWebsiteLive(originalUrl);
+
+        if (live) {
+          logger.info(`Scrape failed but site is live, trying Firecrawl for: ${originalUrl}`);
+
+          try {
+            const firecrawlData = await extractBusinessEmail(originalUrl);
+
+            if (firecrawlData?.business_emails?.length) {
+              firecrawlData.business_emails.forEach(addEmail);
+              logger.info(`Firecrawl found ${firecrawlData.business_emails.length} email(s) for: ${originalUrl}`);
+            }
+          } catch (firecrawlErr) {
+            logger.warn(`Firecrawl also failed for: ${originalUrl} — ${firecrawlErr.message}`);
+          }
+        } else {
+          logger.info(`Site is not live, skipping Firecrawl for: ${originalUrl}`);
+        }
+      }
+
+      const filtered = applyEmailFilters(emails, filterItems, startsWithItems);
+
+      results.push({
+        link_scraped: originalUrl,
+        emails: filtered,
+      });
     }
 
     await supabase
@@ -319,29 +359,22 @@ export const scrapeEmailsTask = task({
       })
       .eq("id", scrappingId);
 
-      // check if it was and auto - outbound
+    // check if it was an auto-outbound
+    if (scrappingName.startsWith("Auto Outbound Scrape")) {
+      let auto_outbound_name = scrappingName.split(" - ")[1];
+      logger.info("getting auto outbound name: " + auto_outbound_name);
 
-      if (scrappingName.startsWith("Auto Outbound Scrape")){
-          let auto_outbound_name = scrappingName.split(" - ")[1];
-          logger.info ("getting auto outbound name: " + auto_outbound_name)
+      const { data: autoOutbound } = await supabase
+        .from("auto_outbounds")
+        .select("*")
+        .eq("name", auto_outbound_name)
+        .single();
 
-          // get the auto outbound  
-          const { data: autoOutbound } = await supabase
-            .from("auto_outbounds")
-            .select("*")
-            .eq("name", auto_outbound_name)
-            .single();
-
-           //trigger auto outbound planner here
-           if (autoOutbound) {
-             await tasks.trigger("auto-outbound-planner", { autoOutbound });
-           }
-
-
+      if (autoOutbound) {
+        await tasks.trigger("auto-outbound-planner", { autoOutbound });
       }
-
-
+    }
 
     return { success: true, results };
   },
-}); 
+});

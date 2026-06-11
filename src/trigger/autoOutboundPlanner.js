@@ -85,7 +85,7 @@ export const autoOutboundPlannerTask = task({
       // 2. Fetch user information for previous allocation state
       const { data: userData, error: userError } = await supabase
         .from("users")
-        .select("last_allocated_email, last_allocated_email_remainder")
+        .select("last_allocated_email, last_allocated_email_remainder, sales_letter_templates")
         .eq("id", autoOutbound.user_id)
         .single();
 
@@ -155,7 +155,8 @@ export const autoOutboundPlannerTask = task({
         domain: autoOutbound.domain,
         existingTasks: existingTasks || [],
         startDate: autoOutbound.start_date,
-        price: autoOutbound.price || undefined
+        price: autoOutbound.price || undefined,
+        userSalesLetterTemplates: userData.sales_letter_templates || {}
       });
 
       if (!llmResult || !llmResult.tasks) {
