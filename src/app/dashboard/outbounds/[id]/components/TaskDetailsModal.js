@@ -32,6 +32,9 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
   const [cancellingEmails, setCancellingEmails] = useState(new Set());
   const [cancellingAll, setCancellingAll] = useState(false);
   const [showFullMessage, setShowFullMessage] = useState(false);
+  const [isEditingBody, setIsEditingBody] = useState(false);
+  const [editedBody, setEditedBody] = useState(task?.body || '');
+  const [savingBody, setSavingBody] = useState(false);
 
   const statusColors = {
     completed: "bg-emerald-500",
@@ -569,45 +572,122 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-sm font-medium text-gray-700">Message Content</h4>
-                      <button
-                        onClick={() => setShowFullMessage(!showFullMessage)}
-                        className="flex items-center gap-1.5 text-xs text-teal-600 hover:text-teal-700"
-                      >
-                        {showFullMessage ? (
-                          <>
-                            <FaCompress className="w-3 h-3" />
-                            Show Less
-                          </>
-                        ) : (
-                          <>
-                            <FaExpand className="w-3 h-3" />
-                            Show Full Message
-                          </>
+                      <div className="flex items-center gap-2">
+                        {task.status === 'scheduled' && !isEditingBody && (
+                          <button
+                            onClick={() => { setIsEditingBody(true); setEditedBody(task.body || ''); }}
+                            className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Edit
+                          </button>
                         )}
-                      </button>
-                    </div>
-                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                      <div className={`whitespace-pre-wrap text-gray-800 text-sm ${
-                        !showFullMessage && task.body && task.body.length > 500 
-                          ? 'max-h-40 overflow-y-auto' 
-                          : ''
-                      }`}>
-                        {task.body ? (
-                          showFullMessage 
-                            ? task.body 
-                            : truncateMessage(task.body, 500)
-                        ) : (
-                          <p className="text-gray-400 italic">No message content</p>
+                        {!isEditingBody && (
+                          <button
+                            onClick={() => setShowFullMessage(!showFullMessage)}
+                            className="flex items-center gap-1.5 text-xs text-teal-600 hover:text-teal-700"
+                          >
+                            {showFullMessage ? (
+                              <>
+                                <FaCompress className="w-3 h-3" />
+                                Show Less
+                              </>
+                            ) : (
+                              <>
+                                <FaExpand className="w-3 h-3" />
+                                Show Full
+                              </>
+                            )}
+                          </button>
                         )}
                       </div>
-                      {task.body && task.body.length > 500 && !showFullMessage && (
-                        <div className="text-center mt-2">
-                          <div className="text-xs text-gray-500">
-                            {Math.ceil(task.body.length / 500)} screens • {task.body.length} characters
+                    </div>
+
+                    {isEditingBody ? (
+                      <div>
+                        <textarea
+                          value={editedBody}
+                          onChange={(e) => setEditedBody(e.target.value)}
+                          rows={12}
+                          className="w-full p-3 text-sm text-gray-800 bg-white border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 resize-y font-mono"
+                          placeholder="Email body..."
+                        />
+                        <div className="flex items-center justify-between mt-2">
+                          <span className="text-xs text-gray-400">{editedBody.length} characters</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => { setIsEditingBody(false); setEditedBody(task.body || ''); }}
+                              disabled={savingBody}
+                              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (!editedBody.trim()) return;
+                                setSavingBody(true);
+                                const toastId = toast.loading('Saving message...');
+                                try {
+                                  const { data: { session } } = await supabase.auth.getSession();
+                                  if (!session) { toast.error('Please log in again', { id: toastId }); return; }
+                                  const res = await fetch('/api/tasks/update-body', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                                    body: JSON.stringify({ task_id: task.id, body: editedBody })
+                                  });
+                                  const result = await res.json();
+                                  if (result.success) {
+                                    toast.success('Message updated successfully', { id: toastId });
+                                    task.body = editedBody;
+                                    setIsEditingBody(false);
+                                    if (onRefresh) onRefresh();
+                                  } else {
+                                    toast.error(result.error || 'Failed to save message', { id: toastId });
+                                  }
+                                } catch (err) {
+                                  toast.error('Failed to save message', { id: toastId });
+                                } finally {
+                                  setSavingBody(false);
+                                }
+                              }}
+                              disabled={savingBody || !editedBody.trim()}
+                              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 flex items-center gap-1.5"
+                            >
+                              {savingBody ? (
+                                <><FaSpinner className="w-3 h-3 animate-spin" /> Saving...</>
+                              ) : (
+                                <>Save Changes</>
+                              )}
+                            </button>
                           </div>
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    ) : (
+                      <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                        <div className={`whitespace-pre-wrap text-gray-800 text-sm ${
+                          !showFullMessage && task.body && task.body.length > 500
+                            ? 'max-h-40 overflow-y-auto'
+                            : ''
+                        }`}>
+                          {task.body ? (
+                            showFullMessage
+                              ? task.body
+                              : truncateMessage(task.body, 500)
+                          ) : (
+                            <p className="text-gray-400 italic">No message content</p>
+                          )}
+                        </div>
+                        {task.body && task.body.length > 500 && !showFullMessage && (
+                          <div className="text-center mt-2">
+                            <div className="text-xs text-gray-500">
+                              {Math.ceil(task.body.length / 500)} screens • {task.body.length} characters
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

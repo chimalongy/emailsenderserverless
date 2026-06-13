@@ -35,7 +35,7 @@ This exact-match domain signals relevance directly to search engines. San Franci
 
 No site rebuild needed. Redirect it to your existing practice and bring in more local clients.
 
-Priced at {price} on GoDaddy. To get it, visit sanfranciscofootandankle.com (notice all in small letters and no spaces)
+Priced at {price} on GoDaddy. To get it, visit sanfranciscofootandankle.com //notice all in small letters and no spaces
         
         
         Best regards,

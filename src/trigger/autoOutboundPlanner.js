@@ -10,7 +10,7 @@ const supabase = createClient(
 
 function getSequenceDates(startDateStr, busyDates) {
   let start = new Date(startDateStr);
-  
+
   while (true) {
     const d1 = new Date(start);
     const d2 = new Date(start); d2.setDate(d2.getDate() + 1);
@@ -20,9 +20,9 @@ function getSequenceDates(startDateStr, busyDates) {
     const format = (d) => d.toISOString().split('T')[0];
 
     const hasConflict = busyDates.has(format(d1)) ||
-                        busyDates.has(format(d2)) ||
-                        busyDates.has(format(d3)) ||
-                        busyDates.has(format(d4));
+      busyDates.has(format(d2)) ||
+      busyDates.has(format(d3)) ||
+      busyDates.has(format(d4));
 
     if (!hasConflict) {
       return [d1.toISOString(), d2.toISOString(), d3.toISOString(), d4.toISOString()];
@@ -138,13 +138,16 @@ export const autoOutboundPlannerTask = task({
       }
 
       // 5. Allocate emails programmatically
+      // useFullCapacity=true: tasks are scheduled on future dates when the daily counter
+      // will have reset, so we fill each account to its full daily_limit.
       const programmaticAllocation = allocateEmails(
         prospectsToAllocate,
         emailAccounts,
         userData.last_allocated_email || "",
         userData.last_allocated_email_remainder !== null && userData.last_allocated_email_remainder !== undefined
           ? parseInt(userData.last_allocated_email_remainder)
-          : 0
+          : 0,
+        true // useFullCapacity — fill to daily_limit, not daily_limit - sent_today
       );
 
       logger.info(`📊 Programmatic email allocation layout calculated: ${JSON.stringify(programmaticAllocation)}`);

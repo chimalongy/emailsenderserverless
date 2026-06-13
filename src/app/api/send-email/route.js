@@ -345,7 +345,7 @@ async function updateTaskStatus(taskId) {
     if (!remainingEmails || remainingEmails.length === 0) {
       const { error: updateError } = await supabase
         .from('tasks')
-        .update({ status: 'completed' })
+        .update({ status: 'completed', updated_at: new Date().toISOString() })
         .eq('id', taskId)
 
       if (updateError) {

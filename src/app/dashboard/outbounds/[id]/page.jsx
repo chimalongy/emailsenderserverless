@@ -512,9 +512,22 @@ export default function OutboundDetailPage() {
                           <span className="bg-gray-50 px-2 py-0.5 rounded">
                             {task.type === 'followup' ? 'Follow-up' : 'Initial'}
                           </span>
-                          {task.scheduled_at && (
-                            <span className="bg-gray-50 px-2 py-0.5 rounded">
-                              {new Date(task.scheduled_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          {(task.status === 'scheduled' || task.status === 'pending') && task.scheduled_at && (
+                            <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded flex items-center gap-1">
+                              <FiClock className="h-2.5 w-2.5" />
+                              {new Date(task.scheduled_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
+                            </span>
+                          )}
+                          {(task.status === 'completed' || task.status === 'complete') && task.updated_at && (
+                            <span className="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded flex items-center gap-1">
+                              <FiCheckCircle className="h-2.5 w-2.5" />
+                              {new Date(task.updated_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
+                            </span>
+                          )}
+                          {(task.status === 'in_progress' || task.status === 'processing') && task.scheduled_at && (
+                            <span className="bg-amber-50 text-amber-600 px-2 py-0.5 rounded flex items-center gap-1">
+                              <FiClock className="h-2.5 w-2.5" />
+                              {new Date(task.scheduled_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
                             </span>
                           )}
                         </div>

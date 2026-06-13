@@ -6,13 +6,17 @@
  * @param {Object[]} emailAccounts - Array of email account objects from the DB.
  * @param {string} lastAllocatedEmail - The email of the last allocated account.
  * @param {number} lastAllocatedEmailRemainder - The remainder capacity of the last allocated account.
+ * @param {boolean} [useFullCapacity=false] - When true, each account's capacity is its full
+ *   daily_limit (ignoring sent_today). Use this for auto-outbound tasks that are scheduled on
+ *   future dates when the daily counter will have reset. When false (default), capacity is
+ *   daily_limit minus sent_today, which is correct for same-day manual sends.
  * @returns {{
  *   allocations: Array<{ account_id: string, allocated_emails: number }>,
  *   last_allocated_email: string,
  *   last_allocated_email_remainder: number
  * }}
  */
-export function allocateEmails(prospects, emailAccounts, lastAllocatedEmail, lastAllocatedEmailRemainder) {
+export function allocateEmails(prospects, emailAccounts, lastAllocatedEmail, lastAllocatedEmailRemainder, useFullCapacity = false) {
   if (!prospects || prospects.length === 0 || !emailAccounts || emailAccounts.length === 0) {
     return {
       allocations: [],
@@ -25,10 +29,16 @@ export function allocateEmails(prospects, emailAccounts, lastAllocatedEmail, las
   const sortedAccounts = [...emailAccounts].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
   const N = sortedAccounts.length;
 
-  // Calculate capacities for each sorted account
-  // Capacity = daily_limit - sent_today
+  // Calculate capacities for each sorted account.
+  // useFullCapacity=true  → use daily_limit directly (auto-outbound: tasks run on future dates
+  //                          when the daily counter has already reset to zero).
+  // useFullCapacity=false → use daily_limit - sent_today (manual same-day send: some emails
+  //                          may already have been sent today).
   const capacities = sortedAccounts.map(acc => {
     const dailyLimit = acc.daily_limit || 0;
+    if (useFullCapacity) {
+      return dailyLimit;
+    }
     const sentToday = acc.sent_today || 0;
     return Math.max(0, dailyLimit - sentToday);
   });

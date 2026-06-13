@@ -46,7 +46,10 @@ export async function POST(request) {
 
     // ── 2. Parse body ─────────────────────────────────────────────────────────
     const body = await request.json();
-    const { name, domain, startDate, price, emailList } = body;
+    const { name, domain, startDate, price, emailList, scrapingId } = body;
+
+    console.log("body", body);
+
 
     if (!name?.trim()) {
       return NextResponse.json(
@@ -100,11 +103,45 @@ export async function POST(request) {
       );
     }
 
-    // ── 4. Insert ─────────────────────────────────────────────────────────────
+    // ── 4. Resolve prospect source ────────────────────────────────────────────
     let scrapeId = null;
     let parsedEmails = [];
 
-    if (emailList && emailList.trim()) {
+    if (scrapingId) {
+      // User chose an existing completed scraping — validate ownership & status
+      const { data: existingScraping, error: scrapeCheckError } = await supabaseAdmin
+        .from('scrappings')
+        .select('id, name, status, emails_found')
+        .eq('id', scrapingId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (scrapeCheckError) {
+        console.error('Scraping lookup error:', scrapeCheckError);
+        return NextResponse.json(
+          { success: false, error: 'Database error while looking up the selected scraping.' },
+          { status: 500 }
+        );
+      }
+
+      if (!existingScraping) {
+        return NextResponse.json(
+          { success: false, error: 'The selected scraping was not found or does not belong to your account.' },
+          { status: 404 }
+        );
+      }
+
+      if (existingScraping.status !== 'completed') {
+        return NextResponse.json(
+          { success: false, error: `The selected scraping is not yet completed (status: ${existingScraping.status}). Please choose a completed scraping.` },
+          { status: 400 }
+        );
+      }
+
+      scrapeId = existingScraping.id;
+
+    } else if (emailList && emailList.trim()) {
+      // User pasted an email list — create a new completed scraping record for it
       parsedEmails = emailList
         .split('\n')
         .map(email => email.trim())
@@ -123,7 +160,6 @@ export async function POST(request) {
         );
       }
 
-      // Create a completed scrape record immediately for the pasted emails
       const { data: scrapeData, error: scrapeError } = await supabaseAdmin
         .from('scrappings')
         .insert({
@@ -180,8 +216,12 @@ export async function POST(request) {
 
     let handle;
     if (scrapeId) {
-      // Bypassing scraping, route directly to allocation & planning
-      handle = await tasks.trigger("auto-outbound-planner", { autoOutbound: created });
+      // Bypassing scraping, route directly to allocation & planning.
+      // Override start_date with the original full ISO timestamp from the request body,
+      // because the DB column may be of type "date" which truncates the time portion.
+      handle = await tasks.trigger("auto-outbound-planner", {
+        autoOutbound: { ...created, start_date: startDate }
+      });
     } else {
       // Normal scraping/setup flow
       const payload = {

@@ -371,7 +371,16 @@ export const scrapeEmailsTask = task({
         .single();
 
       if (autoOutbound) {
-        await tasks.trigger("auto-outbound-planner", { autoOutbound });
+        // autoOutbound.start_date may be a date-only string (e.g. "2026-06-13") if the DB
+        // column is of type "date", which would make getSequenceDates schedule at midnight UTC.
+        // Re-attach a time portion: if it looks like a date-only string, default to 09:00 UTC.
+        const rawDate = autoOutbound.start_date || '';
+        const normalizedStartDate = rawDate.includes('T')
+          ? rawDate
+          : `${rawDate}T09:00:00.000Z`;
+        await tasks.trigger("auto-outbound-planner", {
+          autoOutbound: { ...autoOutbound, start_date: normalizedStartDate }
+        });
       }
     }
 
