@@ -179,7 +179,7 @@ async function isWebsiteLive(url) {
    Payload validator (no zod)
 ----------------------------------- */
 function parsePayload(payload) {
-  const { scrappingId, userId, urls } = payload;
+  const { scrappingId, userId, urls, startDate } = payload;
 
   if (
     typeof scrappingId !== "string" ||
@@ -191,17 +191,17 @@ function parsePayload(payload) {
     );
   }
 
-  return { scrappingId, userId, urls };
+  return { scrappingId, userId, urls, startDate };
 }
 
 /* ----------------------------------
    Trigger.dev Task
------------------------------------ */
+   ----------------------------------- */
 export const scrapeEmailsTask = task({
   id: "scrape-emails-task",
 
   run: async (payload) => {
-    const { scrappingId, urls } = parsePayload(payload);
+    const { scrappingId, urls, startDate } = parsePayload(payload);
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -371,10 +371,9 @@ export const scrapeEmailsTask = task({
         .single();
 
       if (autoOutbound) {
-        // autoOutbound.start_date may be a date-only string (e.g. "2026-06-13") if the DB
-        // column is of type "date", which would make getSequenceDates schedule at midnight UTC.
-        // Re-attach a time portion: if it looks like a date-only string, default to 09:00 UTC.
-        const rawDate = autoOutbound.start_date || '';
+        // Use the passed startDate if available to preserve custom scheduled times,
+        // otherwise fall back to db start_date (which may be date-only due to DB column type).
+        const rawDate = startDate || autoOutbound.start_date || '';
         const normalizedStartDate = rawDate.includes('T')
           ? rawDate
           : `${rawDate}T09:00:00.000Z`;

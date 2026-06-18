@@ -36,6 +36,78 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
   const [editedBody, setEditedBody] = useState(task?.body || '');
   const [savingBody, setSavingBody] = useState(false);
 
+  // Time rescheduling state
+  const [isEditingTime, setIsEditingTime] = useState(false);
+  const [editedTime, setEditedTime] = useState('');
+  const [savingTime, setSavingTime] = useState(false);
+
+  const isRescheduleAllowed = () => {
+    if (task?.status !== 'scheduled' && task?.status !== 'pending') return false;
+    if (!task?.scheduled_at) return false;
+    const scheduledDate = new Date(task.scheduled_at);
+    const today = new Date();
+    
+    const scheduledDay = new Date(Date.UTC(scheduledDate.getUTCFullYear(), scheduledDate.getUTCMonth(), scheduledDate.getUTCDate()));
+    const todayDay = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+    
+    return scheduledDay.getTime() > todayDay.getTime();
+  };
+
+  const startEditingTime = () => {
+    if (!task?.scheduled_at) return;
+    const date = new Date(task.scheduled_at);
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    setEditedTime(`${hours}:${minutes}`);
+    setIsEditingTime(true);
+  };
+
+  const handleSaveTime = async () => {
+    if (!editedTime) return;
+    const [hours, minutes] = editedTime.split(':').map(Number);
+    const newDate = new Date(task.scheduled_at);
+    newDate.setHours(hours, minutes, 0, 0);
+    
+    setSavingTime(true);
+    const toastId = toast.loading('Rescheduling task...');
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Please log in again', { id: toastId });
+        return;
+      }
+      
+      const response = await fetch('/api/tasks/update-schedule-time', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          task_id: task.id,
+          new_scheduled_at: newDate.toISOString()
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        toast.success('Rescheduled successfully', { id: toastId });
+        task.scheduled_at = newDate.toISOString();
+        setIsEditingTime(false);
+        if (onRefresh) onRefresh();
+      } else {
+        toast.error(result.error || 'Failed to reschedule task', { id: toastId });
+      }
+    } catch (err) {
+      console.error('Error rescheduling:', err);
+      toast.error('Failed to reschedule task', { id: toastId });
+    } finally {
+      setSavingTime(false);
+    }
+  };
+
   const statusColors = {
     completed: "bg-emerald-500",
     complete: "bg-emerald-500",
@@ -496,24 +568,66 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
               </div>
 
               <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="p-1.5 bg-purple-100 rounded">
-                    <FaCalendarAlt className="w-4 h-4 text-purple-600" />
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-purple-100 rounded">
+                      <FaCalendarAlt className="w-4 h-4 text-purple-600" />
+                    </div>
+                    <span className="text-sm font-medium text-gray-600">Scheduled</span>
                   </div>
-                  <span className="text-sm font-medium text-gray-600">Scheduled</span>
-                </div>
-                <p className="text-sm font-semibold text-gray-800">
-                  {task.scheduled_at ? (
-                    new Date(task.scheduled_at).toLocaleString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })
-                  ) : (
-                    <span className="text-gray-400">Not scheduled</span>
+                  {isRescheduleAllowed() && !isEditingTime && (
+                    <button
+                      onClick={startEditingTime}
+                      className="text-blue-600 hover:text-blue-700 p-1.5 rounded-full hover:bg-blue-50 transition-colors flex items-center justify-center"
+                      title="Edit schedule time"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
                   )}
-                </p>
+                </div>
+                {isEditingTime ? (
+                  <div className="space-y-2">
+                    <input
+                      type="time"
+                      value={editedTime}
+                      onChange={(e) => setEditedTime(e.target.value)}
+                      className="w-full px-2 py-1 text-sm border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      disabled={savingTime}
+                    />
+                    <div className="flex items-center gap-1.5 justify-end">
+                      <button
+                        onClick={() => setIsEditingTime(false)}
+                        disabled={savingTime}
+                        className="px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSaveTime}
+                        disabled={savingTime || !editedTime}
+                        className="px-2 py-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded flex items-center gap-1"
+                      >
+                        {savingTime ? <FaSpinner className="w-2.5 h-2.5 animate-spin" /> : null}
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm font-semibold text-gray-800">
+                    {task.scheduled_at ? (
+                      new Date(task.scheduled_at).toLocaleString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    ) : (
+                      <span className="text-gray-400">Not scheduled</span>
+                    )}
+                  </p>
+                )}
               </div>
 
               <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">

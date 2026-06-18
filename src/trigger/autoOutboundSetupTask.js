@@ -229,6 +229,7 @@ export const autoOutboundSetupTask = task({
         scrappingId: scrapeData.id,
         userId: userId,
         urls: uniquePlaceUrls,
+        startDate,
       };
       await tasks.trigger("scrape-emails-task", scrapePayload);
       logger.info(`Triggered scrape-emails-task for ${uniquePlaceUrls.length} urls`);
