@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import React from 'react';
-import { 
-  FaClock, 
-  FaPaperPlane, 
+import {
+  FaClock,
+  FaPaperPlane,
   FaExclamationCircle,
   FaCalendarAlt,
   FaUser,
@@ -46,10 +46,10 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
     if (!task?.scheduled_at) return false;
     const scheduledDate = new Date(task.scheduled_at);
     const today = new Date();
-    
+
     const scheduledDay = new Date(Date.UTC(scheduledDate.getUTCFullYear(), scheduledDate.getUTCMonth(), scheduledDate.getUTCDate()));
     const todayDay = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
-    
+
     return scheduledDay.getTime() > todayDay.getTime();
   };
 
@@ -67,17 +67,17 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
     const [hours, minutes] = editedTime.split(':').map(Number);
     const newDate = new Date(task.scheduled_at);
     newDate.setHours(hours, minutes, 0, 0);
-    
+
     setSavingTime(true);
     const toastId = toast.loading('Rescheduling task...');
-    
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         toast.error('Please log in again', { id: toastId });
         return;
       }
-      
+
       const response = await fetch('/api/tasks/update-schedule-time', {
         method: 'POST',
         headers: {
@@ -89,9 +89,9 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
           new_scheduled_at: newDate.toISOString()
         })
       });
-      
+
       const result = await response.json();
-      
+
       if (result.success) {
         toast.success('Rescheduled successfully', { id: toastId });
         task.scheduled_at = newDate.toISOString();
@@ -216,7 +216,7 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
 
       if (result.success) {
         toast.success(`Email sent successfully to ${recipient}`, { id: toastId });
-        
+
         // Refresh emails for the current section
         if (expandedSection && expandedSection.includes('::')) {
           const [accountId, section] = expandedSection.split('::');
@@ -417,11 +417,10 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
                   )}
                 </div>
                 <div className="flex items-center gap-2 mt-1">
-                  <div className={`text-xs flex items-center gap-1 ${
-                    isSent ? 'text-emerald-600' : 
-                    isFailed ? 'text-rose-600' : 
-                    'text-teal-600'
-                  }`}>
+                  <div className={`text-xs flex items-center gap-1 ${isSent ? 'text-emerald-600' :
+                      isFailed ? 'text-rose-600' :
+                        'text-teal-600'
+                    }`}>
                     {isScheduled && <FaClock className="w-3 h-3" />}
                     {isSent && <FaCheckCircle className="w-3 h-3" />}
                     {isFailed && <FaExclamationCircle className="w-3 h-3" />}
@@ -443,11 +442,10 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
                     <button
                       onClick={() => isScheduled ? handleSendNow(email.id, email.recipient) : handleResend(email.id, email.recipient)}
                       disabled={isSending}
-                      className={`px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
-                        isScheduled 
-                          ? 'bg-teal-600 hover:bg-teal-700 text-white' 
+                      className={`px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 ${isScheduled
+                          ? 'bg-teal-600 hover:bg-teal-700 text-white'
                           : 'bg-rose-100 hover:bg-rose-200 text-rose-700'
-                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                       {isSending ? (
                         <>
@@ -508,9 +506,8 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
           <div className="flex items-center gap-3">
-            <div className={`w-2 h-8 rounded-full ${
-              statusColors[task.status] || "bg-gray-400"
-            }`} />
+            <div className={`w-2 h-8 rounded-full ${statusColors[task.status] || "bg-gray-400"
+              }`} />
             <div>
               <h2 className="text-lg font-bold text-gray-800">{task.name}</h2>
               <p className="text-sm text-gray-500 flex items-center gap-2 mt-0.5">
@@ -554,15 +551,14 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
                   </div>
                   <span className="text-sm font-medium text-gray-600">Status</span>
                 </div>
-                <span className={`px-2 py-1 rounded text-sm font-semibold capitalize ${
-                  (task.status === "completed" || task.status === "complete")
+                <span className={`px-2 py-1 rounded text-sm font-semibold capitalize ${(task.status === "completed" || task.status === "complete")
                     ? "bg-emerald-100 text-emerald-700"
                     : task.status === "failed"
-                    ? "bg-rose-100 text-rose-700"
-                    : (task.status === "scheduled" || task.status === "pending")
-                    ? "bg-blue-100 text-blue-700"
-                    : "bg-amber-100 text-amber-700"
-                }`}>
+                      ? "bg-rose-100 text-rose-700"
+                      : (task.status === "scheduled" || task.status === "pending")
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-amber-100 text-amber-700"
+                  }`}>
                   {task.status.replace("_", " ")}
                 </span>
               </div>
@@ -780,11 +776,10 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
                       </div>
                     ) : (
                       <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                        <div className={`whitespace-pre-wrap text-gray-800 text-sm ${
-                          !showFullMessage && task.body && task.body.length > 500
+                        <div className={`whitespace-pre-wrap text-gray-800 text-sm ${!showFullMessage && task.body && task.body.length > 500
                             ? 'max-h-40 overflow-y-auto'
                             : ''
-                        }`}>
+                          }`}>
                           {task.body ? (
                             showFullMessage
                               ? task.body
@@ -869,11 +864,10 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
                             <button
                               key={key}
                               onClick={() => toggleAccordion(key, a.account_id)}
-                              className={`p-2 rounded-lg text-center transition-all flex flex-col items-center justify-center gap-1 ${
-                                expandedSection === `${a.account_id}::${key}`
+                              className={`p-2 rounded-lg text-center transition-all flex flex-col items-center justify-center gap-1 ${expandedSection === `${a.account_id}::${key}`
                                   ? `bg-${color}-100 ring-1 ring-${color}-300`
                                   : `bg-${color}-50 hover:bg-${color}-100`
-                              }`}
+                                }`}
                             >
                               <div className="flex items-center gap-1">
                                 {icon}
@@ -940,7 +934,7 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
                                 </button>
                               </div>
                             </div>
-                            
+
                             <div className="max-h-48 overflow-y-auto">
                               {renderEmailList(
                                 emailsData[expandedSection] || [],
