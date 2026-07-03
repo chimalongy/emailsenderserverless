@@ -9,6 +9,7 @@ const supabase = createClient(
 // The email-sender orchestrator task: Loops, awaits send-email subtask, and handles rate delays
 export const emailSenderTask = task({
   id: "email-sender",
+  maxDuration: "6h",
   run: async (payload) => {
     const { taskId } = payload;
     logger.info(`🚀 Starting email-sender orchestrator task for task ID: ${taskId}`);

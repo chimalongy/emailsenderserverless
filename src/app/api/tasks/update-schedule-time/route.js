@@ -26,7 +26,7 @@ export async function POST(request) {
     }
 
     // 2. Parse and Validate Request Body
-    const { task_id, new_scheduled_at } = await request.json();
+    const { task_id, new_scheduled_at, update_others } = await request.json();
 
     if (!task_id || !new_scheduled_at) {
       return NextResponse.json({ success: false, error: 'Missing task_id or new_scheduled_at' }, { status: 400 });
@@ -35,7 +35,7 @@ export async function POST(request) {
     // 3. Retrieve and Validate Task
     const { data: taskData, error: taskFetchError } = await supabase
       .from('tasks')
-      .select('id, status, scheduled_at, user_id')
+      .select('id, status, scheduled_at, user_id, outbound_id')
       .eq('id', task_id)
       .single();
 
@@ -47,8 +47,8 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 403 });
     }
 
-    if (taskData.status !== 'scheduled') {
-      return NextResponse.json({ success: false, error: 'Only scheduled tasks can be rescheduled' }, { status: 400 });
+    if (taskData.status !== 'scheduled' && taskData.status !== 'pending') {
+      return NextResponse.json({ success: false, error: 'Only scheduled or pending tasks can be rescheduled' }, { status: 400 });
     }
 
     // 4. Validate That Date Has Not Changed and is in the Future
@@ -68,19 +68,19 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'Date cannot be modified, only the execution time' }, { status: 400 });
     }
 
-    // Ensure it is before the day of execution
-    const today = new Date();
-    const oldDayUTC = new Date(Date.UTC(oldDate.getUTCFullYear(), oldDate.getUTCMonth(), oldDate.getUTCDate()));
-    const todayDayUTC = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
-
-    if (oldDayUTC.getTime() <= todayDayUTC.getTime()) {
-      return NextResponse.json({ success: false, error: 'Cannot edit schedule time on or after the day of execution' }, { status: 400 });
+    // Ensure the scheduled time is in the future
+    const now = new Date();
+    if (oldDate.getTime() <= now.getTime()) {
+      return NextResponse.json({ success: false, error: 'Cannot edit schedule time for a task that has already started or is in the past' }, { status: 400 });
     }
 
     // 5. Update Task
     const { error: taskUpdateError } = await supabase
       .from('tasks')
-      .update({ scheduled_at: newDate.toISOString() })
+      .update({
+        scheduled_at: newDate.toISOString(),
+        status: 'scheduled'
+      })
       .eq('id', task_id);
 
     if (taskUpdateError) {
@@ -100,7 +100,69 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'Task updated but failed to update scheduled time in queue' }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, updated_queue_count: count });
+    let updatedOthersCount = 0;
+    if (update_others && taskData.outbound_id) {
+      const { data: otherTasks, error: otherTasksError } = await supabase
+        .from('tasks')
+        .select('id, scheduled_at, status')
+        .eq('outbound_id', taskData.outbound_id)
+        .eq('user_id', user.id)
+        .neq('id', task_id)
+        .in('status', ['scheduled', 'pending']);
+
+      if (otherTasksError) {
+        console.error('Error fetching other tasks:', otherTasksError);
+      } else if (otherTasks && otherTasks.length > 0) {
+        const today = new Date();
+        const todayDayUTC = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+
+        for (const otherTask of otherTasks) {
+          if (!otherTask.scheduled_at) continue;
+
+          const otherDate = new Date(otherTask.scheduled_at);
+          const otherDayUTC = new Date(Date.UTC(otherDate.getUTCFullYear(), otherDate.getUTCMonth(), otherDate.getUTCDate()));
+
+          // Only update tasks whose scheduled date is in the future
+          if (new Date(otherTask.scheduled_at).getTime() > Date.now()) {
+            const updatedScheduledAt = new Date(otherTask.scheduled_at);
+            updatedScheduledAt.setUTCHours(newDate.getUTCHours(), newDate.getUTCMinutes(), 0, 0);
+
+            // Update task scheduled_at
+            const { error: otherTaskUpdateError } = await supabase
+              .from('tasks')
+              .update({
+                scheduled_at: updatedScheduledAt.toISOString(),
+                status: 'scheduled'
+              })
+              .eq('id', otherTask.id);
+
+            if (otherTaskUpdateError) {
+              console.error(`Failed to update task ${otherTask.id}:`, otherTaskUpdateError);
+              continue;
+            }
+
+            // Update pending emails in queue for this task
+            const { error: otherQueueUpdateError } = await supabase
+              .from('email_queue')
+              .update({ scheduled_at: updatedScheduledAt.toISOString() })
+              .eq('task_id', otherTask.id)
+              .eq('status', 'pending');
+
+            if (otherQueueUpdateError) {
+              console.error(`Failed to update email queue for task ${otherTask.id}:`, otherQueueUpdateError);
+            }
+
+            updatedOthersCount++;
+          }
+        }
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      updated_queue_count: count,
+      updated_others_count: updatedOthersCount
+    });
   } catch (err) {
     console.error('Error in update-schedule-time route:', err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });

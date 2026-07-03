@@ -40,6 +40,7 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
   const [isEditingTime, setIsEditingTime] = useState(false);
   const [editedTime, setEditedTime] = useState('');
   const [savingTime, setSavingTime] = useState(false);
+  const [updateOthers, setUpdateOthers] = useState(false);
 
   const isRescheduleAllowed = () => {
     if (task?.status !== 'scheduled' && task?.status !== 'pending') return false;
@@ -47,10 +48,7 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
     const scheduledDate = new Date(task.scheduled_at);
     const today = new Date();
 
-    const scheduledDay = new Date(Date.UTC(scheduledDate.getUTCFullYear(), scheduledDate.getUTCMonth(), scheduledDate.getUTCDate()));
-    const todayDay = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
-
-    return scheduledDay.getTime() > todayDay.getTime();
+    return scheduledDate.getTime() > today.getTime();
   };
 
   const startEditingTime = () => {
@@ -59,6 +57,7 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
     const hours = String(date.getHours()).padStart(2, '0');
     const minutes = String(date.getMinutes()).padStart(2, '0');
     setEditedTime(`${hours}:${minutes}`);
+    setUpdateOthers(false);
     setIsEditingTime(true);
   };
 
@@ -86,14 +85,19 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
         },
         body: JSON.stringify({
           task_id: task.id,
-          new_scheduled_at: newDate.toISOString()
+          new_scheduled_at: newDate.toISOString(),
+          update_others: updateOthers
         })
       });
 
       const result = await response.json();
 
       if (result.success) {
-        toast.success('Rescheduled successfully', { id: toastId });
+        if (updateOthers && result.updated_others_count > 0) {
+          toast.success(`Rescheduled successfully (updated ${result.updated_others_count} other task(s))`, { id: toastId });
+        } else {
+          toast.success('Rescheduled successfully', { id: toastId });
+        }
         task.scheduled_at = newDate.toISOString();
         setIsEditingTime(false);
         if (onRefresh) onRefresh();
@@ -592,6 +596,16 @@ export default function TaskDetailsModal({ onClose, task, allocations, onRefresh
                       className="w-full px-2 py-1 text-sm border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
                       disabled={savingTime}
                     />
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none py-0.5">
+                      <input
+                        type="checkbox"
+                        checked={updateOthers}
+                        onChange={(e) => setUpdateOthers(e.target.checked)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
+                        disabled={savingTime}
+                      />
+                      <span className="text-[11px] text-gray-500 font-medium leading-none">Set as default sending time for other uncompleted tasks</span>
+                    </label>
                     <div className="flex items-center gap-1.5 justify-end">
                       <button
                         onClick={() => setIsEditingTime(false)}

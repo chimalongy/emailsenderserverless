@@ -2,7 +2,7 @@
   "dependencies": {
     "@mendable/firecrawl-js": "^4.25.3",
     "@supabase/supabase-js": "^2.84.0",
-    "@trigger.dev/sdk": "4.4.6",
+    "@trigger.dev/sdk": "4.5.0",
     "@upstash/qstash": "^2.8.4",
     "@upstash/redis": "^1.35.6",
     "apify-client": "^2.23.3",
@@ -26,7 +26,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@trigger.dev/build": "4.4.6",
+    "@trigger.dev/build": "4.5.0",
     "@types/react": "19.2.7",
     "tailwindcss": "^4"
   },
