@@ -86,7 +86,11 @@ export default function OutboundsPage() {
         .from('outbounds')
         .select(`
           *,
-          tasks (count),
+          tasks (
+            id,
+            scheduled_at,
+            created_at
+          ),
           email_queue (count)
         `)
         .eq('user_id', user.id)
@@ -94,12 +98,26 @@ export default function OutboundsPage() {
 
       if (error) throw error
       
-      // Process data to include counts
-      const processedOutbounds = (data || []).map(outbound => ({
-        ...outbound,
-        task_count: outbound.tasks?.[0]?.count || 0,
-        email_count: outbound.email_queue?.[0]?.count || 0
-      }))
+      // Process data to include counts and first/last task dates
+      const processedOutbounds = (data || []).map(outbound => {
+        const outboundTasks = outbound.tasks || []
+        const sortedTasks = [...outboundTasks].sort((a, b) => {
+          const dateA = a.scheduled_at ? new Date(a.scheduled_at) : new Date(a.created_at)
+          const dateB = b.scheduled_at ? new Date(b.scheduled_at) : new Date(b.created_at)
+          return dateA - dateB
+        })
+        
+        const firstTask = sortedTasks[0] || null
+        const lastTask = sortedTasks[sortedTasks.length - 1] || null
+        
+        return {
+          ...outbound,
+          task_count: outboundTasks.length,
+          email_count: outbound.email_queue?.[0]?.count || 0,
+          first_task_start: firstTask ? (firstTask.scheduled_at || firstTask.created_at) : null,
+          last_task_start: lastTask ? (lastTask.scheduled_at || lastTask.created_at) : null
+        }
+      })
       
       setOutbounds(processedOutbounds)
     } catch (error) {
@@ -593,6 +611,36 @@ export default function OutboundsPage() {
                                                         </div>
                                                       </div>
                                                       
+                                                      {outbound.first_task_start && (
+                                                        <div className="text-[10px] text-gray-500 mb-2 bg-gray-50 p-1.5 rounded flex flex-col gap-1 border border-gray-100">
+                                                          <div className="flex justify-between items-center">
+                                                            <span className="text-gray-400">First Task:</span>
+                                                            <span className="font-medium text-gray-700">
+                                                              {new Date(outbound.first_task_start).toLocaleString('en-US', {
+                                                                month: 'short',
+                                                                day: 'numeric',
+                                                                hour: '2-digit',
+                                                                minute: '2-digit',
+                                                                hour12: true
+                                                              })}
+                                                            </span>
+                                                          </div>
+                                                          {outbound.last_task_start && outbound.last_task_start !== outbound.first_task_start && (
+                                                            <div className="flex justify-between items-center border-t border-gray-200/60 pt-1">
+                                                              <span className="text-gray-400">Last Task:</span>
+                                                              <span className="font-medium text-gray-700">
+                                                                {new Date(outbound.last_task_start).toLocaleString('en-US', {
+                                                                  month: 'short',
+                                                                  day: 'numeric',
+                                                                  hour: '2-digit',
+                                                                  minute: '2-digit',
+                                                                  hour12: true
+                                                                })}
+                                                              </span>
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      )}
                                                       <div className="flex gap-1">
                                                         <Link
                                                           href={`/dashboard/outbounds/${outbound.id}`}
